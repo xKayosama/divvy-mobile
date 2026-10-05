@@ -1,9 +1,12 @@
-import { Text, View, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-export default function Index() {
+import { colors } from "@/constants/theme";
+
+export default function HomeScreen() {
   return (
     <View style={styles.container}>
-      <Text>Edit src/app/index.tsx to edit this screen.</Text>
+      <Text style={styles.title}>Divvy</Text>
+      <Text style={styles.subtitle}>Split expenses. Keep it simple.</Text>
     </View>
   );
 }
@@ -13,5 +16,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.background,
+  },
+
+  title: {
+    fontSize: 40,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+
+  subtitle: {
+    marginTop: 8,
+    fontSize: 16,
+    color: colors.mutedForeground,
   },
 });
