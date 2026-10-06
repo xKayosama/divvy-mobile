@@ -3,13 +3,14 @@ import { useRef, useState } from "react";
 import { View } from "react-native";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useLoginMutation } from "@/features/auth/authApi";
 
-import { AuthScreen } from "@/components/auth/AuthScreen";
+import { AuthHeading, AuthScreen } from "@/components/auth/AuthScreen";
+import { FormField, FormMessage } from "@/components/auth/FormField";
 import { useSession } from "@/features/auth/SessionProvider";
 import { authError } from "@/features/auth/errors";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function LoginScreen() {
   const { signIn } = useSession();
@@ -51,71 +52,70 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen>
-      <View className="mb-8">
-        <Text className="text-4xl font-bold text-primary">Divvy</Text>
-
-        <Text className="mt-2 text-base text-muted-foreground">
-          Sign in to manage and split your expenses.
-        </Text>
-      </View>
-
-      <View className="gap-4">
-        <View className="gap-2">
-          <Text className="font-medium">Email</Text>
-
-          <Input
-            placeholder="you@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            accessibilityLabel="Email"
-            value={email}
-            onChangeText={(value) => {
-              setEmail(value);
-              setMessage("");
-            }}
-            editable={!busy}
-          />
-        </View>
-
-        <View className="gap-2">
-          <Text className="font-medium">Password</Text>
-
-          <Input
-            placeholder="Enter your password"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="current-password"
-            accessibilityLabel="Password"
-            value={password}
-            onChangeText={(value) => {
-              setPassword(value);
-              setMessage("");
-            }}
-            editable={!busy}
-            returnKeyType="go"
-            onSubmitEditing={handleLogin}
-          />
-        </View>
-
-        {message ? (
-          <Text accessibilityLiveRegion="polite">{message}</Text>
-        ) : null}
-
-        <Button className="mt-2" onPress={handleLogin} disabled={busy}>
-          <Text>{busy ? "Signing in…" : "Sign in"}</Text>
+      <AuthHeading
+        title="Welcome back."
+        subtitle="Sign in and pick up where you left off."
+      />
+      <View className="gap-5 rounded-[28px] border border-border bg-card p-5">
+        <FormField
+          label="Email address"
+          icon="mail-outline"
+          placeholder="you@example.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          value={email}
+          onChangeText={(value) => {
+            setEmail(value);
+            setMessage("");
+          }}
+          editable={!busy}
+        />
+        <FormField
+          label="Password"
+          icon="lock-closed-outline"
+          password
+          placeholder="Enter your password"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="current-password"
+          value={password}
+          onChangeText={(value) => {
+            setPassword(value);
+            setMessage("");
+          }}
+          editable={!busy}
+          returnKeyType="go"
+          onSubmitEditing={handleLogin}
+        />
+        <FormMessage message={message} />
+        <Button
+          className="mt-1 h-14 rounded-2xl sm:h-14"
+          onPress={handleLogin}
+          disabled={busy}
+        >
+          <Text className="text-base font-semibold">
+            {busy ? "Signing in…" : "Sign in"}
+          </Text>
+          {!busy ? (
+            <Ionicons
+              name="arrow-forward"
+              size={19}
+              color="white"
+              accessible={false}
+            />
+          ) : null}
         </Button>
       </View>
-
-      <View className="mt-6 flex-row justify-center gap-1">
-        <Text className="text-muted-foreground">
-          Don&apos;t have an account?
-        </Text>
-
+      <View className="mt-5 flex-row flex-wrap items-center justify-center">
+        <Text className="text-sm text-muted-foreground">New to Divvy?</Text>
         <Link href="/register" asChild>
-          <Text className="font-semibold text-primary">Sign up</Text>
+          <Button variant="ghost" disabled={busy} className="min-h-12 px-2">
+            <Text className="text-sm font-semibold text-primary">
+              Create an account
+            </Text>
+          </Button>
         </Link>
       </View>
     </AuthScreen>
