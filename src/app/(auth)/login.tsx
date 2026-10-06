@@ -7,11 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useLoginMutation } from "@/features/auth/authApi";
 
+import { AuthScreen } from "@/components/auth/AuthScreen";
+import { useSession } from "@/features/auth/SessionProvider";
+import { authError } from "@/features/auth/errors";
+
 export default function LoginScreen() {
+  const { signIn } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [login, { isLoading }] = useLoginMutation();
+  const [saving, setSaving] = useState(false);
+  const busy = isLoading || saving;
   const submitting = useRef(false);
 
   async function handleLogin() {
@@ -28,28 +35,24 @@ export default function LoginScreen() {
     }
     submitting.current = true;
     try {
-      await login({ email: trimmedEmail, password }).unwrap();
+      const response = await login({ email: trimmedEmail, password }).unwrap();
+      setSaving(true);
+      await signIn(response);
       setPassword("");
-      setMessage("Sign-in request succeeded.");
     } catch (error) {
-      const status = typeof error === "object" && error !== null && "status" in error
-        ? error.status : undefined;
-      setMessage(status === 401 || status === 403
-        ? "The email or password was not accepted. Please try again."
-        : status === "FETCH_ERROR" || status === "TIMEOUT_ERROR"
-          ? "Could not reach the server. Check your connection and try again."
-          : "Sign in failed. Please try again.");
+      setMessage(
+        authError(error, "Could not complete sign in. Please try again."),
+      );
     } finally {
+      setSaving(false);
       submitting.current = false;
     }
   }
 
   return (
-    <View className="flex-1 justify-center bg-background px-6">
+    <AuthScreen>
       <View className="mb-8">
-        <Text className="text-4xl font-bold text-primary">
-          Divvy
-        </Text>
+        <Text className="text-4xl font-bold text-primary">Divvy</Text>
 
         <Text className="mt-2 text-base text-muted-foreground">
           Sign in to manage and split your expenses.
@@ -68,8 +71,11 @@ export default function LoginScreen() {
             autoComplete="email"
             accessibilityLabel="Email"
             value={email}
-            onChangeText={(value) => { setEmail(value); setMessage(""); }}
-            editable={!isLoading}
+            onChangeText={(value) => {
+              setEmail(value);
+              setMessage("");
+            }}
+            editable={!busy}
           />
         </View>
 
@@ -84,17 +90,22 @@ export default function LoginScreen() {
             autoComplete="current-password"
             accessibilityLabel="Password"
             value={password}
-            onChangeText={(value) => { setPassword(value); setMessage(""); }}
-            editable={!isLoading}
+            onChangeText={(value) => {
+              setPassword(value);
+              setMessage("");
+            }}
+            editable={!busy}
             returnKeyType="go"
             onSubmitEditing={handleLogin}
           />
         </View>
 
-        {message ? <Text accessibilityLiveRegion="polite">{message}</Text> : null}
+        {message ? (
+          <Text accessibilityLiveRegion="polite">{message}</Text>
+        ) : null}
 
-        <Button className="mt-2" onPress={handleLogin} disabled={isLoading}>
-          <Text>{isLoading ? "Signing in…" : "Sign in"}</Text>
+        <Button className="mt-2" onPress={handleLogin} disabled={busy}>
+          <Text>{busy ? "Signing in…" : "Sign in"}</Text>
         </Button>
       </View>
 
@@ -104,11 +115,9 @@ export default function LoginScreen() {
         </Text>
 
         <Link href="/register" asChild>
-          <Text className="font-semibold text-primary">
-            Sign up
-          </Text>
+          <Text className="font-semibold text-primary">Sign up</Text>
         </Link>
       </View>
-    </View>
+    </AuthScreen>
   );
 }

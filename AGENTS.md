@@ -1,5 +1,11 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Backend context
+
+Before implementing authentication or backend integration, read `docs/backend.md`.
+The local backend is `/Users/m2/household-expense-tracker-backend`.
+Verify contracts against its current routes/controllers before changing the mobile client, and update the context document when contracts change.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
