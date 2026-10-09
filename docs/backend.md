@@ -1,6 +1,6 @@
 # Divvy backend context
 
-Verified from local backend source on 2026-10-06. Recheck source before changing integrations; this document is a summary, not a substitute for current code.
+Authentication verified from local backend source on 2026-10-06; expense creation/listing and active membership verified on 2026-10-09. Recheck source before changing integrations; this document is a summary, not a substitute for current code.
 
 ## Location and stack
 
@@ -38,6 +38,13 @@ The backend also generates recurring bill occurrences. See its README and bills 
 
 ## Next mobile integration work
 
-Mobile authentication now has typed responses, native secure token persistence (web uses sessionStorage), session restoration via `/auth/me`, bearer request headers, protected routes, logout, and registration. The signed-in home screen is a placeholder. Next implement group listing/creation and the expense dashboard using verified backend contracts.
+Mobile authentication now has typed responses, native secure token persistence (web uses sessionStorage), session restoration via `/auth/me`, bearer request headers, protected routes, logout, and registration. Group listing/creation, the group dashboard, and expense listing/creation are implemented. Verify relevant backend contracts before extending these flows.
 
 Keep credentials, tokens, and environment secrets out of this document.
+
+## Expense integration
+
+- `GET /api/groups/:id/expenses` returns `data.expenses` and top-level `pagination`; accepts `page`, `limit` (1–100), `category`, `startDate`, and `endDate` (`YYYY-MM-DD`). Results sort by date and creation time descending.
+- `POST /api/groups/:id/expenses` accepts description, positive amount, category, paidBy, splitType, participants, optional date and notes. Payer and unique participants must be active members. Returns HTTP 201 with `data.expense`, populated payer and participant users.
+- EQUAL participants contain `userId`; the backend assigns the rounded remainder to the first participant. EXACT participants also contain nonnegative `amount` and must sum to the expense total. PERCENTAGE participants contain `percentage` between 0–100 and must total 100%; the backend adjusts the last participant for rounding.
+- The mobile form supports all three split types and a calendar date; expense cards show the server-calculated shares and notes. Saving invalidates group expenses and dashboard caches.

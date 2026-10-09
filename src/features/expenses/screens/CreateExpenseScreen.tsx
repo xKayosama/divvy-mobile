@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -14,11 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { authError } from "@/features/auth/errors";
 import {
-    useGetGroupMembersQuery,
-    useGetMyGroupsQuery,
+  useGetGroupMembersQuery,
+  useGetMyGroupsQuery,
 } from "@/features/groups/groupsApi";
 import { useCreateExpenseMutation } from "../expensesApi";
-import type { ExpenseCategory } from "../types";
+import type { CreateExpenseRequest, ExpenseCategory } from "../types";
 
 const categories: ExpenseCategory[] = [
   "GROCERIES",
@@ -33,24 +33,26 @@ const categories: ExpenseCategory[] = [
   "OTHERS",
 ];
 
-export default function CreateExpenseScreen({
-  groupId,
-}: {
-  groupId: string;
-}) {
+export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<ExpenseCategory>("OTHERS");
   const [paidBy, setPaidBy] = useState("");
   const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE">(
+    "EQUAL",
+  );
+  const [shares, setShares] = useState<Record<string, string>>({});
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  });
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
   const submitting = useRef(false);
 
   const { data: groupsData } = useGetMyGroupsQuery();
-  const group = groupsData?.data.groups.find(
-    (item) => item.id === groupId,
-  );
+  const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
   const {
     data: membersData,
@@ -60,12 +62,11 @@ export default function CreateExpenseScreen({
     refetch,
   } = useGetGroupMembersQuery(groupId);
 
-  const members = (membersData?.data.members ?? []).flatMap(
-    (member) => (member.userId ? [member.userId] : []),
+  const members = (membersData?.data.members ?? []).flatMap((member) =>
+    member.status === "ACTIVE" && member.userId ? [member.userId] : [],
   );
 
-  const [createExpense, { isLoading: saving }] =
-    useCreateExpenseMutation();
+  const [createExpense, { isLoading: saving }] = useCreateExpenseMutation();
 
   function toggleParticipant(id: string) {
     setMessage("");
@@ -77,7 +78,7 @@ export default function CreateExpenseScreen({
   }
 
   function returnToExpenses() {
-    router.replace({
+    router.navigate({
       pathname: "/groups/[groupId]/expenses",
       params: { groupId },
     });
@@ -112,12 +113,88 @@ export default function CreateExpenseScreen({
 
     if (
       participantIds.length === 0 ||
-      participantIds.some(
-        (id) => !members.some((member) => member._id === id),
-      )
+      participantIds.some((id) => !members.some((member) => member._id === id))
     ) {
       setMessage("Choose at least one active participant.");
       return;
+    }
+
+    const normalizedDate = date.trim();
+    const expenseDate = new Date(`${normalizedDate}T12:00:00`);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate) ||
+      !Number.isFinite(expenseDate.getTime()) ||
+      expenseDate.getFullYear() !== Number(normalizedDate.slice(0, 4)) ||
+      expenseDate.getMonth() + 1 !== Number(normalizedDate.slice(5, 7)) ||
+      expenseDate.getDate() !== Number(normalizedDate.slice(8, 10))
+    ) {
+      setMessage("Enter a valid date in YYYY-MM-DD format.");
+      return;
+    }
+
+    const fields = {
+      description: description.trim(),
+      amount: numericAmount,
+      category,
+      paidBy,
+      date: expenseDate.toISOString(),
+      notes: notes.trim(),
+    };
+    let body: CreateExpenseRequest;
+    if (splitType === "EQUAL") {
+      body = {
+        ...fields,
+        splitType,
+        participants: participantIds.map((userId) => ({ userId })),
+      };
+    } else {
+      const values = participantIds.map((id) =>
+        (shares[id] ?? "").trim().replace(",", "."),
+      );
+      if (
+        values.some(
+          (value) =>
+            !/^\d+(\.\d{1,2})?$/.test(value) || !Number.isFinite(Number(value)),
+        )
+      ) {
+        setMessage(
+          "Enter a nonnegative share for every selected member, with up to two decimals.",
+        );
+        return;
+      }
+      const total = values.reduce(
+        (sum, value) => sum + Math.round(Number(value) * 100),
+        0,
+      );
+      if (splitType === "EXACT") {
+        if (total !== Math.round(numericAmount * 100)) {
+          setMessage("Member amounts must add up to the expense amount.");
+          return;
+        }
+        body = {
+          ...fields,
+          splitType,
+          participants: participantIds.map((userId, index) => ({
+            userId,
+            amount: Number(values[index]),
+          })),
+        };
+      } else {
+        if (values.some((value) => Number(value) > 100) || total !== 10000) {
+          setMessage(
+            "Member percentages must be between 0 and 100 and total 100%.",
+          );
+          return;
+        }
+        body = {
+          ...fields,
+          splitType,
+          participants: participantIds.map((userId, index) => ({
+            userId,
+            percentage: Number(values[index]),
+          })),
+        };
+      }
     }
 
     submitting.current = true;
@@ -125,15 +202,7 @@ export default function CreateExpenseScreen({
     try {
       await createExpense({
         groupId,
-        body: {
-          description: description.trim(),
-          amount: numericAmount,
-          category,
-          paidBy,
-          splitType: "EQUAL",
-          participants: participantIds.map((userId) => ({ userId })),
-          notes: notes.trim(),
-        },
+        body,
       }).unwrap();
 
       returnToExpenses();
@@ -240,7 +309,32 @@ export default function CreateExpenseScreen({
                 </View>
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
-                  <Text className="font-semibold">Split equally between</Text>
+                  <Text className="font-semibold">Split between</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
+                      (value) => (
+                        <Button
+                          key={value}
+                          variant={splitType === value ? "default" : "outline"}
+                          disabled={saving}
+                          accessibilityState={{ selected: splitType === value }}
+                          onPress={() => {
+                            setSplitType(value);
+                            setShares({});
+                            setMessage("");
+                          }}
+                        >
+                          <Text>
+                            {value === "EQUAL"
+                              ? "Equally"
+                              : value === "EXACT"
+                                ? "By amount"
+                                : "By percent"}
+                          </Text>
+                        </Button>
+                      ),
+                    )}
+                  </View>
                   <Text className="text-sm text-muted-foreground">
                     Select everyone sharing this expense.
                   </Text>
@@ -267,9 +361,57 @@ export default function CreateExpenseScreen({
                   })}
 
                   <Text className="text-xs text-muted-foreground">
-                    {participantIds.length} selected · Shares calculated on save
+                    {participantIds.length} selected
+                    {splitType === "EQUAL"
+                      ? " · Shares calculated on save"
+                      : ""}
                   </Text>
                 </View>
+
+                {splitType !== "EQUAL" ? (
+                  <View className="gap-4 rounded-[24px] bg-card p-5">
+                    <Text className="font-semibold">
+                      {splitType === "EXACT"
+                        ? "Member amounts"
+                        : "Member percentages"}
+                    </Text>
+                    <Text className="text-sm text-muted-foreground">
+                      {splitType === "EXACT"
+                        ? "Amounts must add up to the expense total."
+                        : "Percentages must add up to 100%."}
+                    </Text>
+                    {participantIds.map((id) => {
+                      const member = members.find((value) => value._id === id);
+                      return (
+                        <FormField
+                          key={id}
+                          label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
+                          icon="cash-outline"
+                          keyboardType="decimal-pad"
+                          placeholder="0.00"
+                          value={shares[id] ?? ""}
+                          editable={!saving}
+                          onChangeText={(value) =>
+                            setShares((current) => ({
+                              ...current,
+                              [id]: value,
+                            }))
+                          }
+                        />
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                <FormField
+                  label="Expense date"
+                  icon="calendar-outline"
+                  placeholder="YYYY-MM-DD"
+                  value={date}
+                  onChangeText={setDate}
+                  editable={!saving}
+                  autoCapitalize="none"
+                />
 
                 <FormField
                   label="Notes"
