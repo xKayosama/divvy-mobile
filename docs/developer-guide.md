@@ -4,7 +4,7 @@ This guide describes the repository as of October 9, 2026. Read [AGENTS.md](../A
 
 ## Current scope and stack
 
-Divvy targets iOS, Android, and web. Registration, login, session restoration, protected navigation, and logout are implemented. Home displays the signed-in user and a groups placeholder. Group management, expenses, bills, balances, settlements, and receipt scanning are future mobile work.
+Divvy targets iOS, Android, and web. Registration, login, session restoration, protected navigation, and logout are implemented. Signed-in users enter the group list. Group listing/creation, the group dashboard, and expense listing/creation have feature screens; bills and group settings currently use placeholders.
 
 | Concern | Implementation |
 | --- | --- |
@@ -62,16 +62,16 @@ src/
   app/                 Route screens and navigator layouts
     _layout.tsx        Providers, restoration gate, protected stacks
     index.tsx          Entry redirect
-    (auth)/            Login and registration
-    (app)/             Signed-in routes, currently home
+    (auth)/            Thin login and registration route wrappers
+    (app)/             Groups, group tabs, expense creation, profile
   components/
     auth/              AuthScreen, headings, fields, messages
     brand/             Brand mark and wordmark
     ui/                Shared Button, Input, and Text
   constants/theme.ts   Colors and layout constants
-  features/auth/       Endpoints, types, slice, storage, session lifecycle
+  features/            Feature screens, endpoints, types, and state
   hooks/redux.ts       Typed Redux hooks
-  lib/                 Class-name utility and theme definitions
+  lib/                 Shared class-name utility
   services/api.ts      Shared RTK Query API and bearer/error handling
   store/index.ts       Redux store and API middleware
   global.css           Tailwind directives and semantic color variables
@@ -83,7 +83,7 @@ Use `@/` to import from src; `@/assets/` maps to root assets. Keep components, h
 
 ## Navigation and authentication
 
-The root layout installs Redux, safe-area, and session providers. Navigation waits for restoration, showing a loading state or retryable error first. Users without a session see the auth stack; authenticated users see the app stack. The entry route redirects to login or home.
+The root layout installs Redux, safe-area, and session providers. Navigation waits for restoration, showing a loading state or retryable error first. Users without a session see the auth stack; authenticated users see the app stack. The entry route redirects to login or groups. The legacy /home route also redirects to groups.
 
 Use Expo Router for navigation and import helpers from expo-router. Put authenticated screens in `(app)` and preserve the session gate. Backend authorization remains necessary independently of UI route guards. See the [Router introduction](https://docs.expo.dev/router/introduction/).
 
@@ -115,7 +115,7 @@ The backend summary uses `/api/groups`, data.group/data.groups, and groupId. Do 
 
 Reuse Button and Text from components/ui. Authentication screens share AuthScreen, AuthHeading, FormField, and FormMessage. FormField forwards TextInput props, manages focus styling, and provides an accessible password visibility control.
 
-Prefer semantic classes such as bg-background, text-foreground, and border-border. Review global.css, constants/theme.ts, and lib/theme.ts together when changing colors. Automatic system UI configuration does not prove that every screen supports dark mode.
+Prefer semantic classes such as bg-background, text-foreground, and border-border. Review global.css and constants/theme.ts together when changing colors; the unused lib/theme.ts module has been removed. Automatic system UI configuration does not prove that every screen supports dark mode.
 
 Tailwind currently scans src/app and src/components only. If JSX with classes moves under src/features or another directory, update tailwind.config.js content paths. Keep class names statically discoverable.
 
