@@ -1,3 +1,4 @@
+import { useTheme } from "@/theme/ThemeProvider";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import { View } from "react-native";
@@ -13,6 +14,7 @@ import { authError } from "@/features/auth/errors";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const { signIn } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -102,7 +104,7 @@ export default function LoginScreen() {
             <Ionicons
               name="arrow-forward"
               size={19}
-              color="white"
+              color={colors.primaryForeground}
               accessible={false}
             />
           ) : null}

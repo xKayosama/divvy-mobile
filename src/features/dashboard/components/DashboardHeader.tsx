@@ -4,7 +4,9 @@ import { Pressable, View } from "react-native";
 
 import { Brand } from "@/components/brand/Brand";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { useAppSelector } from "@/hooks/redux";
+import { useTheme } from "@/theme/ThemeProvider";
 
 type Props = {
   groupName: string;
@@ -17,8 +19,10 @@ export default function DashboardHeader({
   currency,
   onSwitchGroup,
 }: Props) {
+  const { colors, surfaces } = useTheme();
+  const user = useAppSelector((state) => state.auth.user);
   return (
-    <View className="gap-6">
+    <View className="gap-5">
       <View className="flex-row items-center justify-between">
         <Brand />
 
@@ -27,13 +31,9 @@ export default function DashboardHeader({
           accessibilityLabel="Open profile"
           onPress={() => router.push("/profile")}
           className="h-12 w-12 items-center justify-center rounded-full border border-border bg-card"
+          style={{ boxShadow: surfaces.card.boxShadow }}
         >
-          <Ionicons
-            name="person-outline"
-            size={22}
-            color={colors.primary}
-            accessible={false}
-          />
+          <UserAvatar firstName={user?.firstName} lastName={user?.lastName} size={44} />
         </Pressable>
       </View>
 
@@ -42,6 +42,7 @@ export default function DashboardHeader({
         accessibilityLabel={`Switch group. Current group: ${groupName}`}
         onPress={onSwitchGroup}
         className="min-h-12 max-w-full flex-row items-center gap-3 self-start rounded-full border border-border bg-card px-4 py-3"
+        style={{ boxShadow: surfaces.card.boxShadow }}
       >
         <Ionicons
           name="people-outline"
@@ -72,6 +73,9 @@ export default function DashboardHeader({
       </Pressable>
 
       <View className="gap-2">
+        <Text className="text-xs font-semibold text-secondary-foreground" style={{ letterSpacing: 2 }}>
+          YOUR SHARED FINANCES
+        </Text>
         <Text className="text-3xl font-semibold tracking-tight">
           Overview
         </Text>

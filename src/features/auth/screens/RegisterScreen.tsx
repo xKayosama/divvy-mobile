@@ -1,3 +1,4 @@
+import { useTheme } from "@/theme/ThemeProvider";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import { View } from "react-native";
@@ -10,6 +11,7 @@ import { useRegisterMutation } from "@/features/auth/authApi";
 import { authError } from "@/features/auth/errors";
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -63,7 +65,7 @@ export default function RegisterScreen() {
           <Ionicons
             name="checkmark"
             size={32}
-            color="#1769F5"
+            color={colors.primary}
             accessible={false}
           />
         </View>
@@ -77,7 +79,7 @@ export default function RegisterScreen() {
             <Ionicons
               name="arrow-forward"
               size={19}
-              color="white"
+              color={colors.primaryForeground}
               accessible={false}
             />
           </Button>

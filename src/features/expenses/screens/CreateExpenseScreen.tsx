@@ -316,6 +316,7 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                         <Button
                           key={value}
                           variant={splitType === value ? "default" : "outline"}
+                          className="min-h-12 h-auto grow rounded-2xl px-4 py-3"
                           disabled={saving}
                           accessibilityState={{ selected: splitType === value }}
                           onPress={() => {
@@ -324,7 +325,7 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                             setMessage("");
                           }}
                         >
-                          <Text>
+                          <Text className="text-sm font-semibold">
                             {value === "EQUAL"
                               ? "Equally"
                               : value === "EXACT"

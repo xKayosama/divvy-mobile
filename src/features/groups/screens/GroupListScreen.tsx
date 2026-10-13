@@ -1,72 +1,94 @@
-import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { Brand } from "@/components/brand/Brand";
+import ScreenBackground from "@/components/layout/ScreenBackground";
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { useAppSelector } from "@/hooks/redux";
+import { useTheme } from "@/theme/ThemeProvider";
 import { useGetMyGroupsQuery } from "../groupsApi";
 
 export default function GroupListScreen() {
-  const { data, isLoading, isError, refetch } = useGetMyGroupsQuery();
-
-  if (isLoading) {
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator />
-        <Text className="mt-3">Loading your groups…</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (isError) {
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-background px-6">
-        <Text>Unable to load your groups.</Text>
-        <Button onPress={() => void refetch()}>
-          <Text>Retry</Text>
-        </Button>
-      </SafeAreaView>
-    );
-  }
+  const { colors, surfaces } = useTheme();
+  const insets = useSafeAreaInsets();
+  const user = useAppSelector((state) => state.auth.user);
+  const { data, isLoading, isFetching, isError, refetch } = useGetMyGroupsQuery();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-background">
+      <ScreenBackground />
       <FlatList
         data={data?.data.groups ?? []}
         keyExtractor={(group) => group.id}
-        contentContainerStyle={{ padding: 24, flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        refreshing={isFetching && !isLoading}
+        onRefresh={() => { if (!isFetching) void refetch(); }}
+        contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 20) + 20, flexGrow: 1 }}
         ListHeaderComponent={
-        <View className="mb-6 gap-4">
-          <Text className="text-2xl font-semibold">
-            Your groups
-          </Text>
-
-          <Button onPress={() => router.push("/groups/create")}>
-            <Text>Create group</Text>
-          </Button>
-         </View>
+          <View className="mb-6 gap-6">
+            <View className="flex-row items-center justify-between">
+              <Brand />
+              <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push("/profile")}>
+                <UserAvatar firstName={user?.firstName} lastName={user?.lastName} />
+              </Pressable>
+            </View>
+            <View className="gap-2">
+              <Text className="text-xs font-semibold text-secondary-foreground" style={{ letterSpacing: 2 }}>SHARED SPACES</Text>
+              <Text className="text-3xl font-semibold tracking-tight">Your groups</Text>
+              <Text className="text-sm text-muted-foreground">Choose a group to manage your shared spending.</Text>
+            </View>
+            <Button className="h-14 rounded-2xl" onPress={() => router.push("/groups/create")}>
+              <Ionicons name="add" size={22} color={colors.primaryForeground} accessible={false} />
+              <Text className="font-semibold">Create group</Text>
+            </Button>
+            {isError ? (
+              <View className="gap-3">
+                <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">Unable to load your groups.</Text>
+                <Button variant="outline" className="rounded-xl" disabled={isFetching} onPress={() => void refetch()}><Text>Retry</Text></Button>
+              </View>
+            ) : data ? <Text className="text-xs text-muted-foreground">{data.data.groups.length} {data.data.groups.length === 1 ? "group" : "groups"}</Text> : null}
+          </View>
         }
         ListEmptyComponent={
-          <Text>You haven’t joined or created a group yet.</Text>
+          isLoading ? (
+            <View className="items-center gap-3 py-10"><ActivityIndicator color={colors.primary} /><Text>Loading your groups…</Text></View>
+          ) : !isError ? (
+            <View className="items-center gap-3 px-6 py-10" style={surfaces.card}>
+              <Ionicons name="people-outline" size={32} color={colors.primary} accessible={false} />
+              <Text className="text-lg font-semibold">A space for shared spending</Text>
+              <Text className="text-center text-sm text-muted-foreground">Create your first group for your household, friends, or next trip.</Text>
+            </View>
+          ) : null
         }
         ItemSeparatorComponent={() => <View className="h-3" />}
         renderItem={({ item }) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityLabel={`Open ${item.name}`}
-    className="rounded-xl border border-border bg-card p-4"
-    onPress={() =>
-      router.push({
-        pathname: "/groups/[groupId]/home",
-        params: { groupId: item.id },
-      })
-    }
-  >
-    <Text className="text-lg font-semibold">{item.name}</Text>
-    <Text className="mt-1 text-muted-foreground">
-      {item.currency} · {item.role}
-    </Text>
-  </Pressable>
-)}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.name}`}
+            style={({ pressed }) => ({ ...surfaces.card, padding: 20, opacity: pressed ? 0.8 : 1 })}
+            onPress={() => router.push({ pathname: "/groups/[groupId]/home", params: { groupId: item.id } })}
+          >
+            <View className="flex-row items-center gap-4">
+              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-secondary">
+                <Ionicons name="people-outline" size={24} color={colors.primary} accessible={false} />
+              </View>
+              <View className="min-w-0 flex-1 gap-2">
+                <Text className="text-lg font-semibold">{item.name}</Text>
+                <View className="flex-row flex-wrap items-center gap-2">
+                  <Text className="text-xs text-muted-foreground">{item.currency}</Text>
+                  <View className="rounded-full bg-secondary px-2 py-1">
+                    <Text className="text-xs font-medium text-secondary-foreground">{item.role.charAt(0) + item.role.slice(1).toLowerCase()}</Text>
+                  </View>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} accessible={false} />
+            </View>
+          </Pressable>
+        )}
       />
     </SafeAreaView>
   );

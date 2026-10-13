@@ -4,7 +4,7 @@ import { View } from "react-native";
 export function BrandMark({ size = 44 }: { size?: number }) {
   return (
     <Image
-      source={require("@/assets/images/divvy-icon.png")}
+      source={require("@/assets/images/divvy-icon-green.png")}
       contentFit="contain"
       accessibilityLabel="Divvy"
       accessible
@@ -18,19 +18,19 @@ export function Brand() {
     <View
       accessible
       accessibilityLabel="Divvy"
-      style={{ width: 152, height: 52, overflow: "hidden" }}
+      style={{ width: 152, height: 52 }}
     >
       {/* The supplied wordmark includes transparent padding around the artwork. */}
       <Image
-        source={require("@/assets/images/divvy-logo.png")}
+        source={require("@/assets/images/divvy-word-green.png")}
         contentFit="contain"
         accessible={false}
         style={{
-          width: 240,
-          height: 80,
+          width: 210,
+          height: 70,
           position: "absolute",
-          left: -44,
-          top: -16,
+          left: -30,
+          top: -6,
         }}
       />
     </View>

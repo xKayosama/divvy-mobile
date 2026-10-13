@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState, type ComponentProps } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { useTheme } from "@/theme/ThemeProvider";
 
 type Props = ComponentProps<typeof TextInput> & {
   label: string;
@@ -10,6 +10,7 @@ type Props = ComponentProps<typeof TextInput> & {
   password?: boolean;
 };
 export function FormField({ label, icon, password = false, ...props }: Props) {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [focused, setFocused] = useState(false);
   return (
@@ -72,6 +73,7 @@ export function FormField({ label, icon, password = false, ...props }: Props) {
   );
 }
 export function FormMessage({ message }: { message: string }) {
+  const { colors } = useTheme();
   if (!message) return null;
   return (
     <View className="flex-row items-start gap-2 rounded-xl bg-destructive/5 p-3">

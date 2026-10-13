@@ -1,10 +1,12 @@
-import ScreenPlaceholder from "@/components/layout/ScreenPlaceholder";
+import BillsScreen from "@/features/bills/screens/BillsScreen";
+import { useLocalSearchParams } from "expo-router";
+import { Text } from "react-native";
 
 export default function BillsRoute() {
-  return (
-    <ScreenPlaceholder
-      title="Bills"
-      description="Manage your upcoming and paid bills."
-    />
-  );
+  const { groupId } = useLocalSearchParams<{ groupId: string }>();
+
+  if (!groupId) return <Text>No group selected.</Text>;
+
+  return <BillsScreen key={groupId} groupId={groupId} />;
 }
+

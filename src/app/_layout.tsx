@@ -12,7 +12,7 @@ import { Provider } from "react-redux";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
 import {
   SessionProvider,
   useSession,
@@ -60,11 +60,12 @@ function Navigator() {
 }
 
 function ThemedStatusBar() {
+  const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
 
       <View
         pointerEvents="none"
@@ -74,7 +75,7 @@ function ThemedStatusBar() {
           left: 0,
           right: 0,
           height: insets.top,
-          backgroundColor: colors.primary,
+          backgroundColor: colors.background,
         }}
       />
     </>
@@ -85,6 +86,7 @@ export default function RootLayout() {
   return (
     <Provider store={store}>
       <SafeAreaProvider>
+        <ThemeProvider>
         <SessionProvider>
           <View style={{ flex: 1 }}>
             <Navigator />
@@ -92,6 +94,7 @@ export default function RootLayout() {
             <PortalHost />
           </View>
         </SessionProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </Provider>
   );

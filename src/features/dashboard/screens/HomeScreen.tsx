@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabContentBottomInset } from "@/constants/navigation";
 
 import { Button } from "@/components/ui/button";
+import ScreenBackground from "@/components/layout/ScreenBackground";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { useTheme } from "@/theme/ThemeProvider";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import BillSummaryCards from "../components/BillSummaryCards";
 import DashboardHeader from "../components/DashboardHeader";
@@ -14,6 +16,8 @@ import UpcomingBills from "../components/UpcomingBills";
 import { useGetGroupDashboardQuery } from "../dashboardApi";
 
 export default function HomeScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { data: groupsData } = useGetMyGroupsQuery();
 
@@ -36,10 +40,11 @@ export default function HomeScreen() {
       edges={["top", "left", "right"]}
       className="flex-1 bg-background"
     >
+      <ScreenBackground />
       <ScrollView showsVerticalScrollIndicator={false}
     contentContainerStyle={{
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: tabContentBottomInset(insets.bottom),
     flexGrow: 1,
   }}
   refreshControl={

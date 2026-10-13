@@ -2,7 +2,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { View } from "react-native";
 
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { useTheme } from "@/theme/ThemeProvider";
+import BillStatusBadge from "@/features/bills/components/BillStatusBadge";
 import type { UpcomingBill } from "../types";
 
 type Props = {
@@ -20,8 +21,9 @@ export default function UpcomingBills({
   bills,
   formatAmount,
 }: Props) {
+  const { colors, surfaces } = useTheme();
   return (
-    <View className="rounded-[24px] bg-card p-5">
+    <View className="rounded-[24px] bg-card p-5" style={surfaces.card}>
       <View className="mb-4 flex-row items-center justify-between">
         <Text className="text-lg font-semibold">Coming up</Text>
 
@@ -82,11 +84,7 @@ export default function UpcomingBills({
 
             <View className="flex-row flex-wrap items-center justify-between gap-3">
               <View className="flex-row flex-wrap items-center gap-2">
-                <View className="rounded-full bg-amber-50 px-3 py-1">
-                  <Text className="text-xs font-medium text-amber-800">
-                    Pending
-                  </Text>
-                </View>
+                <BillStatusBadge status={bill.status} />
 
                 {bill.isRecurring && bill.recurrence ? (
                   <Text className="text-xs text-muted-foreground">

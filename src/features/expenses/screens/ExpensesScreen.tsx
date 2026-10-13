@@ -5,8 +5,10 @@ import { ActivityIndicator, FlatList, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/button";
+import ScreenBackground from "@/components/layout/ScreenBackground";
+import { tabContentBottomInset } from "@/constants/navigation";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { useTheme } from "@/theme/ThemeProvider";
 import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useGetGroupExpensesQuery } from "../expensesApi";
@@ -18,6 +20,7 @@ const splitLabels = {
 };
 
 export default function ExpensesScreen({ groupId }: { groupId: string }) {
+  const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
 
@@ -47,6 +50,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
         paddingRight: insets.right,
       }}
     >
+      <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
         <Text className="text-3xl font-semibold tracking-tight">Expenses</Text>
 
@@ -121,7 +125,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             padding: 20,
-            paddingBottom: 72 + Math.max(insets.bottom, 12) + 24,
+            paddingBottom: tabContentBottomInset(insets.bottom),
             flexGrow: 1,
           }}
           refreshing={isFetching && !!currentData}
@@ -131,7 +135,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
           }}
           ItemSeparatorComponent={() => <View className="h-3" />}
           renderItem={({ item }) => (
-            <View className="gap-4 rounded-[24px] bg-card p-5">
+            <View className="gap-4 rounded-[24px] bg-card p-5" style={surfaces.card}>
               <View className="flex-row items-center gap-3">
                 <View className="h-11 w-11 items-center justify-center rounded-2xl bg-secondary">
                   <Ionicons

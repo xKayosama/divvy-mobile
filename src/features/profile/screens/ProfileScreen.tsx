@@ -7,13 +7,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { useTheme } from "@/theme/ThemeProvider";
 import { useLogoutMutation } from "@/features/auth/authApi";
 import { authError, errorStatus } from "@/features/auth/errors";
 import { useSession } from "@/features/auth/SessionProvider";
 import { useAppSelector } from "@/hooks/redux";
 
 export default function ProfileScreen() {
+  const { colors, preference, setPreference, saveError } = useTheme();
   const user = useAppSelector((state) => state.auth.user);
   const { clear } = useSession();
   const [logout] = useLogoutMutation();
@@ -75,12 +77,7 @@ export default function ProfileScreen() {
           </View>
 
           <View className="items-center gap-3 rounded-[28px] bg-card px-5 py-8">
-            <View className="h-20 w-20 items-center justify-center rounded-full bg-secondary">
-              <Text className="text-2xl font-semibold text-primary">
-                {user?.firstName.charAt(0)}
-                {user?.lastName.charAt(0)}
-              </Text>
-            </View>
+            <UserAvatar firstName={user?.firstName} lastName={user?.lastName} size={80} />
 
             <Text className="text-center text-xl font-semibold">
               {user?.firstName} {user?.lastName}
@@ -116,6 +113,25 @@ export default function ProfileScreen() {
               </Text>
               <Text className="font-medium">{user?.email}</Text>
             </View>
+          </View>
+
+          <View className="gap-4 rounded-[24px] bg-card p-5">
+            <Text className="text-lg font-semibold">Appearance</Text>
+            <View className="flex-row gap-2">
+              {(["light", "dark", "system"] as const).map((option) => (
+                <Button
+                  key={option}
+                  variant={preference === option ? "default" : "outline"}
+                  className="flex-1 rounded-xl"
+                  accessibilityState={{ selected: preference === option }}
+                  onPress={() => setPreference(option)}
+                >
+                  <Text>{option.charAt(0).toUpperCase() + option.slice(1)}</Text>
+                </Button>
+              ))}
+            </View>
+            <Text className="text-xs text-muted-foreground">System follows your device appearance.</Text>
+            <FormMessage message={saveError ?? ""} />
           </View>
 
           <FormMessage message={message} />

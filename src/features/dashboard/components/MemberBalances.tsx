@@ -1,6 +1,7 @@
 import { View } from "react-native";
 
 import { Text } from "@/components/ui/text";
+import { useTheme } from "@/theme/ThemeProvider";
 import type { MemberBalance } from "../types";
 
 type Props = {
@@ -12,8 +13,9 @@ export default function MemberBalances({
   balances,
   formatAmount,
 }: Props) {
+  const { colors, statusColors, surfaces } = useTheme();
   return (
-    <View className="rounded-[24px] bg-card p-5">
+    <View className="rounded-[24px] bg-card p-5" style={surfaces.card}>
       <Text className="mb-3 text-lg font-semibold">
         Who owes what
       </Text>
@@ -28,17 +30,11 @@ export default function MemberBalances({
           const receiving = net > 0;
           const owing = net < 0;
 
-          const badgeStyle = receiving
-            ? "bg-emerald-50"
+          const palette = receiving
+            ? statusColors.PAID
             : owing
-              ? "bg-amber-50"
-              : "bg-muted";
-
-          const textStyle = receiving
-            ? "text-emerald-800"
-            : owing
-              ? "text-amber-800"
-              : "text-muted-foreground";
+              ? statusColors.PENDING
+              : { background: colors.muted, foreground: colors.mutedForeground };
 
           const label = receiving
             ? `To receive: ${formatAmount(net)}`
@@ -74,9 +70,10 @@ export default function MemberBalances({
               </View>
 
               <View
-                className={`self-start rounded-full px-3 py-2 ${badgeStyle}`}
+                className="self-start rounded-full px-3 py-2"
+                style={{ backgroundColor: palette.background }}
               >
-                <Text className={`text-xs font-medium ${textStyle}`}>
+                <Text className="text-xs font-medium" style={{ color: palette.foreground }}>
                   {label}
                 </Text>
               </View>

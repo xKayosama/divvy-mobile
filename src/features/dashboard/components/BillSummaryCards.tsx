@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { View } from "react-native";
 
 import { Text } from "@/components/ui/text";
-import { colors } from "@/constants/theme";
+import { useTheme } from "@/theme/ThemeProvider";
 
 type Props = {
   pendingAmount: string;
@@ -46,20 +46,22 @@ function BillCard({
   count: number;
   overdue: boolean;
 }) {
+  const { colors, statusColors, surfaces } = useTheme();
+  const palette = statusColors[overdue ? "OVERDUE" : "PENDING"];
+
   return (
     <View
-      style={{ flexGrow: 1, flexBasis: 140 }}
+      style={{ ...surfaces.card, flexGrow: 1, flexBasis: 140 }}
       className="gap-4 rounded-[24px] border border-border bg-card p-4"
     >
       <View
-        className={`h-10 w-10 items-center justify-center rounded-2xl ${
-          overdue ? "bg-destructive/10" : "bg-secondary"
-        }`}
+        className="h-10 w-10 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: palette.background }}
       >
         <Ionicons
           name={overdue ? "alert-circle-outline" : "calendar-outline"}
           size={20}
-          color={overdue ? colors.destructive : colors.primary}
+          color={palette.foreground}
           accessible={false}
         />
       </View>
@@ -72,11 +74,8 @@ function BillCard({
       </View>
 
       <Text
-        className={`text-xs ${
-          overdue && count > 0
-            ? "text-destructive"
-            : "text-muted-foreground"
-        }`}
+        className="text-xs"
+        style={{ color: count > 0 ? palette.foreground : colors.mutedForeground }}
       >
         {count} {count === 1 ? "bill" : "bills"}
         {overdue && count > 0 ? " · Needs attention" : ""}
