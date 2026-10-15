@@ -97,7 +97,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
               accessibilityRole="button"
               disabled={isFetching}
               onPress={refresh}
-              style={{ paddingVertical: 12 }}
+              style={{ paddingVertical: 12, minHeight: 48 }}
             >
               <Text style={{ color: colors.primary }}>
                 {isFetching ? "Retrying…" : "Retry"}
@@ -108,6 +108,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
       </View>
 
       <FlatList
+        scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
         style={{ flex: 1 }}
         data={bills}
         keyExtractor={(bill) => bill._id}
@@ -252,6 +253,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
                       style={{
                         flex: 1,
                         padding: 14,
+                        minHeight: 48,
                         alignItems: "center",
                         borderRadius: 12,
                         backgroundColor: colors.secondary,

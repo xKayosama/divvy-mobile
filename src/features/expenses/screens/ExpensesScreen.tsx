@@ -91,7 +91,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
       </View>
 
       {(currentData?.data.expenses.length ?? 0) === 0 ? (
-        <View style={{ flex: 1, padding: 20 }}>
+        <View style={{ flex: 1, padding: 20, paddingBottom: tabContentBottomInset(insets.bottom) }}>
           {isFetching ? (
             <View className="items-center gap-3 py-10">
               <ActivityIndicator color={colors.primary} />
@@ -119,6 +119,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
         </View>
       ) : (
         <FlatList
+          scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
           style={{ flex: 1 }}
           data={currentData?.data.expenses ?? []}
           keyExtractor={(expense) => expense._id}

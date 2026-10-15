@@ -2,7 +2,7 @@ export const floatingTabBar = {
   height: 68,
   margin: 20,
   minBottom: 8,
-  contentGap: 24,
+  contentGap: 32,
 } as const;
 
 export function tabBarBottomOffset(bottomInset: number) {

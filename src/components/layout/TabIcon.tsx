@@ -14,9 +14,9 @@ export default function TabIcon({ name, focused, color, size }: Props) {
   return (
     <View
       style={{
-        width: 44,
-        height: 30,
-        borderRadius: 15,
+        width: 48,
+        height: 32,
+        borderRadius: 16,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: focused ? glass.active : "transparent",
@@ -25,7 +25,7 @@ export default function TabIcon({ name, focused, color, size }: Props) {
         boxShadow: focused ? "0 2px 6px rgba(8,127,101,0.08)" : undefined,
       }}
     >
-      <Ionicons name={name} color={color} size={Math.min(size, 22)} accessible={false} />
+      <Ionicons name={name} color={color} size={Math.min(size, 24)} accessible={false} />
     </View>
   );
 }

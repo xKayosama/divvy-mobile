@@ -42,6 +42,7 @@ export default function HomeScreen() {
     >
       <ScreenBackground />
       <ScrollView showsVerticalScrollIndicator={false}
+    scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
     contentContainerStyle={{
     padding: 20,
     paddingBottom: tabContentBottomInset(insets.bottom),
