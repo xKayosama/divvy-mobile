@@ -1,6 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { View } from "react-native";
-
 import { Text } from "@/components/ui/text";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -18,7 +17,7 @@ export default function BillSummaryCards({
   overdueCount,
 }: Props) {
   return (
-    <View className="flex-row flex-wrap gap-3">
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
       <BillCard
         title="Pending bills"
         amount={pendingAmount}
@@ -48,38 +47,79 @@ function BillCard({
 }) {
   const { colors, statusColors, surfaces } = useTheme();
   const palette = statusColors[overdue ? "OVERDUE" : "PENDING"];
+  const active = count > 0;
+  const accent = active ? palette.foreground : colors.mutedForeground;
 
   return (
     <View
-      style={{ ...surfaces.card, flexGrow: 1, flexBasis: 140 }}
-      className="gap-4 rounded-[24px] border border-border bg-card p-4"
+      style={{
+        ...surfaces.card,
+        flexGrow: 1,
+        flexBasis: 140,
+        borderRadius: 20,
+        padding: 16,
+        gap: 16,
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
     >
-      <View
-        className="h-10 w-10 items-center justify-center rounded-2xl"
-        style={{ backgroundColor: palette.background }}
-      >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Ionicons
-          name={overdue ? "alert-circle-outline" : "calendar-outline"}
-          size={20}
-          color={palette.foreground}
+          name={
+            overdue
+              ? active
+                ? "alert-circle-outline"
+                : "checkmark-circle-outline"
+              : "calendar-outline"
+          }
+          size={18}
+          color={accent}
           accessible={false}
         />
-      </View>
-
-      <View className="gap-1">
-        <Text className="text-xs text-muted-foreground">{title}</Text>
-        <Text className="text-2xl font-semibold tracking-tight">
-          {amount}
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontSize: 12,
+            fontWeight: "500",
+            flex: 1,
+          }}
+        >
+          {title}
         </Text>
       </View>
-
       <Text
-        className="text-xs"
-        style={{ color: count > 0 ? palette.foreground : colors.mutedForeground }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+        style={{
+          color: colors.foreground,
+          fontSize: 26,
+          lineHeight: 34,
+          fontWeight: "600",
+          letterSpacing: -0.8,
+          fontVariant: ["tabular-nums"],
+        }}
       >
-        {count} {count === 1 ? "bill" : "bills"}
-        {overdue && count > 0 ? " · Needs attention" : ""}
+        {amount}
       </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: 3,
+            backgroundColor: accent,
+          }}
+        />
+        <Text style={{ color: accent, fontSize: 11, flex: 1 }}>
+          {active
+            ? `${count} ${count === 1 ? "bill" : "bills"} ${overdue ? "overdue" : "to pay"}`
+            : overdue
+              ? "All caught up"
+              : "Nothing due"}
+        </Text>
+      </View>
     </View>
   );
 }

@@ -1,11 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import { Pressable, View } from "react-native";
 
 import { Brand } from "@/components/brand/Brand";
 import { Text } from "@/components/ui/text";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { useAppSelector } from "@/hooks/redux";
 import { useTheme } from "@/theme/ThemeProvider";
 
 type Props = {
@@ -20,21 +17,11 @@ export default function DashboardHeader({
   onSwitchGroup,
 }: Props) {
   const { colors, surfaces } = useTheme();
-  const user = useAppSelector((state) => state.auth.user);
   return (
     <View className="gap-5">
       <View className="flex-row items-center justify-between">
         <Brand />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-          onPress={() => router.push("/profile")}
-          className="h-12 w-12 items-center justify-center rounded-full border border-border bg-card"
-          style={{ boxShadow: surfaces.card.boxShadow }}
-        >
-          <UserAvatar firstName={user?.firstName} lastName={user?.lastName} size={44} />
-        </Pressable>
       </View>
 
       <Pressable

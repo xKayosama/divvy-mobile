@@ -175,3 +175,217 @@ test("missing API configuration fails locally without a network request", async 
     (error) => error.status === "CUSTOM_ERROR",
   );
 });
+
+const { expensesApi } = require("../src/features/expenses/expensesApi.ts");
+const { dashboardApi } = require("../src/features/dashboard/dashboardApi.ts");
+
+for (const operation of ["updateExpense", "deleteExpense"]) {
+  test(`${operation} uses the expense endpoint and refreshes list, detail, and dashboard`, async () => {
+    signedIn();
+    const expense = { _id: "e1", groupId: "g1", description: "Dinner" };
+    const body = {
+      description: "Updated dinner",
+      amount: 100,
+      category: "FOOD",
+      paidBy: "u1",
+      splitType: "EXACT",
+      participants: [{ userId: "u1", amount: 100 }],
+      date: "2026-10-15T04:00:00.000Z",
+      notes: "Corrected",
+    };
+    const counts = { list: 0, detail: 0, dashboard: 0 };
+    global.fetch = async (request) => {
+      assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+      if (request.method !== "GET") {
+        assert.equal(request.url, "https://divvy.test/api/expenses/e1");
+        assert.equal(
+          request.method,
+          operation === "updateExpense" ? "PUT" : "DELETE",
+        );
+        if (operation === "updateExpense")
+          assert.deepEqual(await request.json(), body);
+        else assert.equal(await request.text(), "");
+        return respond(200, { success: true, code: 200, data: { expense } });
+      }
+      if (request.url.includes("/dashboard")) {
+        counts.dashboard++;
+        return respond(200, { success: true, data: {} });
+      }
+      if (request.url.includes("/groups/g1/expenses")) {
+        counts.list++;
+        return respond(200, { success: true, data: { expenses: [expense] } });
+      }
+      assert.equal(request.url, "https://divvy.test/api/expenses/e1");
+      counts.detail++;
+      return respond(200, { success: true, data: { expense } });
+    };
+    const queries = [
+      store.dispatch(
+        expensesApi.endpoints.getGroupExpenses.initiate({ groupId: "g1" }),
+      ),
+      store.dispatch(expensesApi.endpoints.getExpense.initiate("e1")),
+      store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+    ];
+    try {
+      await Promise.all(queries.map((query) => query.unwrap()));
+      await store
+        .dispatch(
+          expensesApi.endpoints[operation].initiate({
+            groupId: "g1",
+            expenseId: "e1",
+            body,
+          }),
+        )
+        .unwrap();
+      await Promise.all(
+        store
+          .dispatch(api.util.getRunningQueriesThunk())
+          .map((query) => query.unwrap()),
+      );
+      assert.deepEqual(counts, { list: 2, detail: 2, dashboard: 2 });
+    } finally {
+      queries.forEach((query) => query.unsubscribe());
+    }
+  });
+}
+
+test("expense mutation errors preserve the session and cached list", async () => {
+  signedIn();
+  let reads = 0;
+  global.fetch = async (request) => {
+    if (request.method === "GET") {
+      reads++;
+      return respond(200, {
+        success: true,
+        data: { expenses: [{ _id: "e1" }] },
+      });
+    }
+    return respond(403, {
+      success: false,
+      message: "You do not have access to this expense.",
+    });
+  };
+  const query = store.dispatch(
+    expensesApi.endpoints.getGroupExpenses.initiate({ groupId: "g1" }),
+  );
+  try {
+    await query.unwrap();
+    for (const operation of ["updateExpense", "deleteExpense"]) {
+      await assert.rejects(
+        store
+          .dispatch(
+            expensesApi.endpoints[operation].initiate({
+              groupId: "g1",
+              expenseId: "e1",
+              body: {},
+            }),
+          )
+          .unwrap(),
+        (error) => error.status === 403,
+      );
+    }
+    assert.equal(reads, 1);
+    assert.equal(store.getState().auth.token, "saved-token");
+    assert.equal(
+      expensesApi.endpoints.getGroupExpenses.select({ groupId: "g1" })(
+        store.getState(),
+      ).data.data.expenses.length,
+      1,
+    );
+  } finally {
+    query.unsubscribe();
+  }
+});
+
+const {
+  validateExpenseFilters,
+} = require("../src/features/expenses/filters.ts");
+
+test("expense filters reject impossible and reversed dates but allow open ranges", () => {
+  for (const filters of [
+    {},
+    { startDate: "2024-02-29" },
+    { endDate: "2026-10-15" },
+    { startDate: "2026-10-15", endDate: "2026-10-15" },
+  ]) {
+    assert.equal(validateExpenseFilters(filters), "");
+  }
+  for (const value of [
+    "2026-02-29",
+    "2026-04-31",
+    "2026-13-01",
+    "2026-00-01",
+    "15/10/2026",
+  ]) {
+    assert.match(
+      validateExpenseFilters({ startDate: value }),
+      /valid start date/,
+    );
+    assert.match(validateExpenseFilters({ endDate: value }), /valid end date/);
+  }
+  assert.match(
+    validateExpenseFilters({ startDate: "2026-10-16", endDate: "2026-10-15" }),
+    /on or after/,
+  );
+});
+
+test("expense filters reach the server and use separate caches for ranges and pages", async () => {
+  signedIn();
+  const requests = [];
+  global.fetch = async (request) => {
+    const url = new URL(request.url);
+    assert.equal(url.pathname, "/api/groups/g1/expenses");
+    const params = Object.fromEntries(url.searchParams);
+    requests.push(params);
+    return respond(200, {
+      success: true,
+      data: { expenses: [{ _id: JSON.stringify(params) }] },
+    });
+  };
+  const filters = {
+    groupId: "g1",
+    category: "FOOD",
+    startDate: "2026-10-01",
+    endDate: "2026-10-15",
+  };
+  const args = [
+    filters,
+    { ...filters, page: 2 },
+    { groupId: "g1", endDate: "2026-10-15" },
+    { groupId: "g1" },
+  ];
+  for (const value of args) {
+    await store
+      .dispatch(
+        expensesApi.endpoints.getGroupExpenses.initiate(value, {
+          subscribe: false,
+        }),
+      )
+      .unwrap();
+  }
+  assert.deepEqual(requests, [
+    {
+      page: "1",
+      limit: "10",
+      category: "FOOD",
+      startDate: "2026-10-01",
+      endDate: "2026-10-15",
+    },
+    {
+      page: "2",
+      limit: "10",
+      category: "FOOD",
+      startDate: "2026-10-01",
+      endDate: "2026-10-15",
+    },
+    { page: "1", limit: "10", endDate: "2026-10-15" },
+    { page: "1", limit: "10" },
+  ]);
+  for (const [index, value] of args.entries()) {
+    assert.equal(
+      expensesApi.endpoints.getGroupExpenses.select(value)(store.getState())
+        .data.data.expenses[0]._id,
+      JSON.stringify(requests[index]),
+    );
+  }
+});

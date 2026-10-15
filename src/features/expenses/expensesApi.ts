@@ -1,9 +1,11 @@
 import { api } from "@/services/api";
 import type {
-    CreateExpenseRequest,
-    CreateExpenseResponse,
-    ExpensesResponse,
-    GetExpensesRequest,
+  CreateExpenseRequest,
+  CreateExpenseResponse,
+  ExpensesResponse,
+  GetExpensesRequest,
+  ExpenseResponse,
+  DeleteExpenseResponse,
 } from "./types";
 
 export const expensesApi = api
@@ -12,13 +14,58 @@ export const expensesApi = api
   })
   .injectEndpoints({
     endpoints: (builder) => ({
-      getGroupExpenses: builder.query<
-        ExpensesResponse,
-        GetExpensesRequest
+      getExpense: builder.query<ExpenseResponse, string>({
+        query: (expenseId) => `/expenses/${encodeURIComponent(expenseId)}`,
+        providesTags: (_result, _error, expenseId) => [
+          { type: "Expenses", id: `expense:${expenseId}` },
+        ],
+      }),
+      updateExpense: builder.mutation<
+        ExpenseResponse,
+        { groupId: string; expenseId: string; body: CreateExpenseRequest }
       >({
-        query: ({ groupId, page = 1, limit = 10 }) => ({
+        query: ({ expenseId, body }) => ({
+          url: `/expenses/${encodeURIComponent(expenseId)}`,
+          method: "PUT",
+          body,
+        }),
+        invalidatesTags: (_result, error, { groupId, expenseId }) =>
+          error
+            ? []
+            : [
+                { type: "Expenses", id: groupId },
+                { type: "Expenses", id: `expense:${expenseId}` },
+                { type: "Dashboard", id: groupId },
+              ],
+      }),
+      deleteExpense: builder.mutation<
+        DeleteExpenseResponse,
+        { groupId: string; expenseId: string }
+      >({
+        query: ({ expenseId }) => ({
+          url: `/expenses/${encodeURIComponent(expenseId)}`,
+          method: "DELETE",
+        }),
+        invalidatesTags: (_result, error, { groupId, expenseId }) =>
+          error
+            ? []
+            : [
+                { type: "Expenses", id: groupId },
+                { type: "Expenses", id: `expense:${expenseId}` },
+                { type: "Dashboard", id: groupId },
+              ],
+      }),
+      getGroupExpenses: builder.query<ExpensesResponse, GetExpensesRequest>({
+        query: ({
+          groupId,
+          page = 1,
+          limit = 10,
+          category,
+          startDate,
+          endDate,
+        }) => ({
           url: `/groups/${encodeURIComponent(groupId)}/expenses`,
-          params: { page, limit },
+          params: { page, limit, category, startDate, endDate },
         }),
         providesTags: (_result, _error, { groupId }) => [
           { type: "Expenses", id: groupId },
@@ -48,4 +95,7 @@ export const expensesApi = api
 export const {
   useGetGroupExpensesQuery,
   useCreateExpenseMutation,
+  useGetExpenseQuery,
+  useUpdateExpenseMutation,
+  useDeleteExpenseMutation,
 } = expensesApi;

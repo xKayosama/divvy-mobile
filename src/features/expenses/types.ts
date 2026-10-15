@@ -58,6 +58,9 @@ export type GetExpensesRequest = {
   groupId: string;
   page?: number;
   limit?: number;
+  category?: ExpenseCategory;
+  startDate?: string;
+  endDate?: string;
 };
 
 type ExpenseFields = {
@@ -92,4 +95,12 @@ export type CreateExpenseResponse = {
   data: {
     expense: Expense;
   };
+};
+
+export type ExpenseResponse = CreateExpenseResponse;
+
+export type DeleteExpenseResponse = {
+  code: number;
+  success: true;
+  message: string;
 };

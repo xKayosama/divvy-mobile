@@ -1,7 +1,7 @@
 # Divvy mobile
 
 An Expo / React Native app for shared expenses, targeting iOS, Android, and web.
-Authentication is implemented; home currently contains a groups placeholder.
+Authentication, group listing/creation, dashboards, and expense listing/creation/editing/deletion are implemented. Bills support listing; group settings remain a placeholder.
 
 See the [developer guide](docs/developer-guide.md) for setup, architecture, workflows, and troubleshooting.
 

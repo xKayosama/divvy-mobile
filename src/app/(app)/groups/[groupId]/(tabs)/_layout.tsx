@@ -111,6 +111,21 @@ export default function GroupTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        initialParams={{ groupId }}
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ focused, color, size }) => (
+            <TabIcon
+              focused={focused}
+              name={focused ? "person" : "person-outline"}
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

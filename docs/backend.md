@@ -45,6 +45,17 @@ Keep credentials, tokens, and environment secrets out of this document.
 ## Expense integration
 
 - `GET /api/groups/:id/expenses` returns `data.expenses` and top-level `pagination`; accepts `page`, `limit` (1–100), `category`, `startDate`, and `endDate` (`YYYY-MM-DD`). Results sort by date and creation time descending.
+- Filtering reverified against `expense.routes.js` and `expense.controller.js` on 2026-10-15: category is uppercased; start date is inclusive UTC midnight and end date includes the entire UTC day. Either date can be omitted. The mobile filter dialog validates calendar dates and range order, applies category/date filters together, resets pagination to page one, and can clear all filters. Pagination and refresh retain the applied filters. Filtered results use separate RTK Query cache entries and share group invalidation tags.
 - `POST /api/groups/:id/expenses` accepts description, positive amount, category, paidBy, splitType, participants, optional date and notes. Payer and unique participants must be active members. Returns HTTP 201 with `data.expense`, populated payer and participant users.
 - EQUAL participants contain `userId`; the backend assigns the rounded remainder to the first participant. EXACT participants also contain nonnegative `amount` and must sum to the expense total. PERCENTAGE participants contain `percentage` between 0–100 and must total 100%; the backend adjusts the last participant for rounding.
 - The mobile form supports all three split types and a calendar date; expense cards show the server-calculated shares and notes. Saving invalidates group expenses and dashboard caches.
+
+### Expense editing and deletion (verified 2026-10-15)
+
+Source: `src/modules/expenses/expense.routes.js`, `expense.controller.js`, and mounts in `src/app.js`.
+
+- `GET /api/expenses/:expenseId`: HTTP 200 with `data.expense`, including populated payer and participant users.
+- `PUT /api/expenses/:expenseId`: accepts the same fields as creation; omitted fields retain existing values. HTTP 200 returns `data.expense`. Splits are recalculated and the payer and participants must all be active members. The mobile edit form submits the complete validated expense.
+- `DELETE /api/expenses/:expenseId`: HTTP 200 returns `{ code: 200, success: true, message }` without expense data.
+- All three require bearer authentication and ACTIVE membership in the expense's group. Any active member can edit/delete, regardless of who paid; there is no owner-only restriction. Missing expenses return 404; nonmembers return 403.
+- Mobile editing loads the expense by ID, checks its group against the route, and prepopulates the existing form. Unavailable payers/participants must be replaced/removed before saving. Deletion requires confirmation displaying description and amount. Successful edits/deletions invalidate the group's expense list, expense detail, and dashboard; deletion returns pagination to page one.

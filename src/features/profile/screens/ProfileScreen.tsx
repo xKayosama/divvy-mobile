@@ -2,8 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { tabContentBottomInset } from "@/constants/navigation";
 import { FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -14,7 +15,8 @@ import { authError, errorStatus } from "@/features/auth/errors";
 import { useSession } from "@/features/auth/SessionProvider";
 import { useAppSelector } from "@/hooks/redux";
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) {
+  const insets = useSafeAreaInsets();
   const { colors, preference, setPreference, saveError } = useTheme();
   const user = useAppSelector((state) => state.auth.user);
   const { clear } = useSession();
@@ -48,14 +50,14 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView edges={inTabs ? ["top", "left", "right"] : ["top", "bottom", "left", "right"]} className="flex-1 bg-background">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 20, flexGrow: 1 }}
+        contentContainerStyle={{ padding: 20, flexGrow: 1, paddingBottom: inTabs ? tabContentBottomInset(insets.bottom) : 20 }}
       >
         <View className="gap-6">
           <View className="flex-row items-center gap-3">
-            <Button
+            {!inTabs ? <Button
               variant="outline"
               className="h-12 w-12 rounded-full p-0"
               accessibilityLabel="Go back"
@@ -71,7 +73,7 @@ export default function ProfileScreen() {
                 color={colors.foreground}
                 accessible={false}
               />
-            </Button>
+            </Button> : null}
 
             <Text className="text-2xl font-semibold">Profile</Text>
           </View>

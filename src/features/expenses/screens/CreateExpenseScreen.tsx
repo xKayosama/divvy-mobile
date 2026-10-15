@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -17,37 +18,53 @@ import {
   useGetGroupMembersQuery,
   useGetMyGroupsQuery,
 } from "@/features/groups/groupsApi";
-import { useCreateExpenseMutation } from "../expensesApi";
-import type { CreateExpenseRequest, ExpenseCategory } from "../types";
+import { useTheme } from "@/theme/ThemeProvider";
+import { categoryIcons } from "../categoryIcons";
+import { expenseCategories } from "../filters";
+import {
+  useCreateExpenseMutation,
+  useUpdateExpenseMutation,
+} from "../expensesApi";
+import type { CreateExpenseRequest, Expense, ExpenseCategory } from "../types";
 
-const categories: ExpenseCategory[] = [
-  "GROCERIES",
-  "FOOD",
-  "RENT",
-  "UTILITIES",
-  "INTERNET",
-  "TRANSPORTATION",
-  "HEALTHCARE",
-  "ENTERTAINMENT",
-  "SHOPPING",
-  "OTHERS",
-];
+function calendarDate(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
 
-export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory>("OTHERS");
-  const [paidBy, setPaidBy] = useState("");
-  const [participantIds, setParticipantIds] = useState<string[]>([]);
-  const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE">(
-    "EQUAL",
+export default function CreateExpenseScreen({
+  groupId,
+  expense,
+}: {
+  groupId: string;
+  expense?: Expense;
+}) {
+  const { colors } = useTheme();
+  const [description, setDescription] = useState(expense?.description ?? "");
+  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const [category, setCategory] = useState<ExpenseCategory>(
+    expense?.category ?? "OTHERS",
   );
-  const [shares, setShares] = useState<Record<string, string>>({});
+  const [paidBy, setPaidBy] = useState(expense?.paidBy?._id ?? "");
+  const [participantIds, setParticipantIds] = useState<string[]>(
+    expense?.participants.map((p, i) => p.userId?._id ?? `missing:${i}`) ?? [],
+  );
+  const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE">(
+    expense?.splitType ?? "EQUAL",
+  );
+  const [shares, setShares] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      expense?.participants.map((p, i) => [
+        p.userId?._id ?? `missing:${i}`,
+        String(
+          expense.splitType === "PERCENTAGE" ? (p.percentage ?? "") : p.amount,
+        ),
+      ]) ?? [],
+    ),
+  );
   const [date, setDate] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    return calendarDate(expense ? new Date(expense.date) : new Date());
   });
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(expense?.notes ?? "");
   const [message, setMessage] = useState("");
   const submitting = useRef(false);
 
@@ -66,7 +83,12 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
     member.status === "ACTIVE" && member.userId ? [member.userId] : [],
   );
 
-  const [createExpense, { isLoading: saving }] = useCreateExpenseMutation();
+  const [createExpense, { isLoading: creating }] = useCreateExpenseMutation();
+  const [updateExpense, { isLoading: updating }] = useUpdateExpenseMutation();
+  const saving = creating || updating;
+  const unavailableIds = participantIds.filter(
+    (id) => !members.some((member) => member._id === id),
+  );
 
   function toggleParticipant(id: string) {
     setMessage("");
@@ -115,7 +137,9 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
       participantIds.length === 0 ||
       participantIds.some((id) => !members.some((member) => member._id === id))
     ) {
-      setMessage("Choose at least one active participant.");
+      setMessage(
+        "Choose at least one active participant and remove unavailable members.",
+      );
       return;
     }
 
@@ -137,7 +161,10 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
       amount: numericAmount,
       category,
       paidBy,
-      date: expenseDate.toISOString(),
+      date:
+        expense && normalizedDate === calendarDate(new Date(expense.date))
+          ? expense.date
+          : expenseDate.toISOString(),
       notes: notes.trim(),
     };
     let body: CreateExpenseRequest;
@@ -200,10 +227,11 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
     submitting.current = true;
 
     try {
-      await createExpense({
-        groupId,
-        body,
-      }).unwrap();
+      if (expense) {
+        await updateExpense({ groupId, expenseId: expense._id, body }).unwrap();
+      } else {
+        await createExpense({ groupId, body }).unwrap();
+      }
 
       returnToExpenses();
     } catch (error) {
@@ -227,7 +255,7 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
           <View className="gap-6">
             <View className="gap-2">
               <Text className="text-3xl font-semibold tracking-tight">
-                Add expense
+                {expense ? "Edit expense" : "Add expense"}
               </Text>
               <Text className="text-sm text-muted-foreground">
                 {group?.name ?? "Your group"}
@@ -273,7 +301,7 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                 <View className="gap-3">
                   <Text className="font-semibold">Category</Text>
                   <View className="flex-row flex-wrap gap-2">
-                    {categories.map((value) => (
+                    {expenseCategories.map((value) => (
                       <Button
                         key={value}
                         variant={category === value ? "default" : "outline"}
@@ -282,6 +310,16 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                         accessibilityState={{ selected: category === value }}
                         onPress={() => setCategory(value)}
                       >
+                        <Ionicons
+                          name={categoryIcons[value]}
+                          size={18}
+                          color={
+                            category === value
+                              ? colors.primaryForeground
+                              : colors.foreground
+                          }
+                          accessible={false}
+                        />
                         <Text className="capitalize">
                           {value.toLowerCase()}
                         </Text>
@@ -292,6 +330,13 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Paid by</Text>
+                  {expense &&
+                  !members.some((member) => member._id === paidBy) ? (
+                    <Text className="text-sm text-muted-foreground">
+                      The original payer is unavailable. Choose an active
+                      member.
+                    </Text>
+                  ) : null}
                   {members.map((member) => (
                     <Button
                       key={member._id}
@@ -320,8 +365,8 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                           disabled={saving}
                           accessibilityState={{ selected: splitType === value }}
                           onPress={() => {
+                            if (value !== splitType) setShares({});
                             setSplitType(value);
-                            setShares({});
                             setMessage("");
                           }}
                         >
@@ -340,6 +385,16 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                     Select everyone sharing this expense.
                   </Text>
 
+                  {unavailableIds.map((id) => (
+                    <Button
+                      key={id}
+                      variant="outline"
+                      disabled={saving}
+                      onPress={() => toggleParticipant(id)}
+                    >
+                      <Text>Remove unavailable participant</Text>
+                    </Button>
+                  ))}
                   {members.map((member) => {
                     const selected = participantIds.includes(member._id);
 
@@ -353,8 +408,15 @@ export default function CreateExpenseScreen({ groupId }: { groupId: string }) {
                         accessibilityState={{ checked: selected }}
                         onPress={() => toggleParticipant(member._id)}
                       >
+                        {selected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={20}
+                            color={colors.secondaryForeground}
+                            accessible={false}
+                          />
+                        ) : null}
                         <Text>
-                          {selected ? "✓ " : ""}
                           {member.firstName} {member.lastName}
                         </Text>
                       </Button>

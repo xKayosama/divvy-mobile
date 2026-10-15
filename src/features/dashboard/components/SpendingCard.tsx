@@ -3,77 +3,145 @@ import { useTheme } from "@/theme/ThemeProvider";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, View } from "react-native";
 
-type Props = {
-  amount: string;
-  currency?: string;
-};
+type Props = { amount: string; currency?: string };
 
 export default function SpendingCard({ amount, currency }: Props) {
-  const { brandGradients, colors } = useTheme();
-  const gradient = `linear-gradient(45deg, ${brandGradients.spending.join(", ")})`;
+  const { brandGradients } = useTheme();
+  const gradient = `linear-gradient(125deg, ${brandGradients.spending.join(", ")})`;
 
   return (
     <View
       style={{
-        borderRadius: 28,
-        padding: 24,
-        gap: 20,
+        borderRadius: 24,
+        padding: 22,
         overflow: "hidden",
         backgroundColor: "#15533F",
-        boxShadow: "0 8px 24px rgba(8,99,79,0.18)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.12)",
         ...Platform.select({
           web: { backgroundImage: gradient },
           default: { experimental_backgroundImage: gradient },
         }),
       }}
     >
-      <View className="flex-row items-center justify-between gap-3">
+      <View
+        pointerEvents="none"
+        accessible={false}
+        style={{
+          position: "absolute",
+          width: 220,
+          height: 220,
+          borderRadius: 110,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+          right: -100,
+          top: -80,
+        }}
+      />
+      <View
+        pointerEvents="none"
+        accessible={false}
+        style={{
+          position: "absolute",
+          width: 160,
+          height: 160,
+          borderRadius: 80,
+          backgroundColor: "rgba(255,255,255,0.03)",
+          right: -70,
+          top: -50,
+        }}
+      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <View
-          className="h-11 w-11 items-center justify-center rounded-2xl"
-          style={{ backgroundColor: colors.accent }}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 11,
+            backgroundColor: "rgba(255,255,255,0.12)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <Ionicons
             name="wallet-outline"
-            size={22}
-            color={colors.accentForeground}
+            size={18}
+            color="#B6F3DB"
             accessible={false}
           />
         </View>
-
-        {currency ? (
-          <View
-            className="rounded-full px-3 py-2"
-            style={{ backgroundColor: colors.secondary }}
-          >
-            <Text
-              className="text-xs font-semibold"
-              style={{ color: colors.secondaryForeground }}
-            >
-              {currency}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View className="gap-2">
-        <Text className="text-sm text-white">
+        <Text
+          style={{ color: "#D3EDE2", fontSize: 13, fontWeight: "500", flex: 1 }}
+        >
           Total shared spending
         </Text>
-
-        <Text className="text-4xl font-semibold tracking-tight text-white" style={{ fontVariant: ["tabular-nums"] }}>
+        <View
+          style={{
+            borderRadius: 8,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.16)",
+          }}
+        >
+          <Text
+            style={{
+              color: "#D3EDE2",
+              fontSize: 10,
+              fontWeight: "600",
+              letterSpacing: 0.8,
+            }}
+          >
+            ALL TIME
+          </Text>
+        </View>
+      </View>
+      <View style={{ paddingTop: 24, paddingBottom: 22, gap: 5 }}>
+        {currency ? (
+          <Text
+            style={{
+              color: "#B6F3DB",
+              fontSize: 12,
+              fontWeight: "600",
+              letterSpacing: 1.5,
+            }}
+          >
+            {currency}
+          </Text>
+        ) : null}
+        <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
+          numberOfLines={1}
+          style={{
+            color: "#FFFFFF",
+            fontSize: 42,
+            lineHeight: 50,
+            fontWeight: "700",
+            letterSpacing: -1.5,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
           {amount}
         </Text>
       </View>
-
-      <View className="flex-row items-center gap-2 border-t border-white/20 pt-4">
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 7,
+          borderTopWidth: 1,
+          borderColor: "rgba(255,255,255,0.12)",
+          paddingTop: 14,
+        }}
+      >
         <Ionicons
-          name="time-outline"
-          size={16}
-          color={colors.accent}
+          name="people-outline"
+          size={14}
+          color="#B6F3DB"
           accessible={false}
         />
-        <Text className="text-xs text-white">
-          All time · Recorded group expenses
+        <Text style={{ color: "#D3EDE2", fontSize: 12, flex: 1 }}>
+          Recorded expenses across your group
         </Text>
       </View>
     </View>
