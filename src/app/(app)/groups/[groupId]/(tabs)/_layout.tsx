@@ -1,9 +1,9 @@
-import { useTheme } from "@/theme/ThemeProvider";
-import TabIcon from "@/components/layout/TabIcon";
 import TabBarBackground from "@/components/layout/TabBarBackground";
+import TabIcon from "@/components/layout/TabIcon";
+import { floatingTabBar, tabBarBottomOffset } from "@/constants/navigation";
+import { useTheme } from "@/theme/ThemeProvider";
 import { Tabs, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { floatingTabBar, tabBarBottomOffset } from "@/constants/navigation";
 
 export default function GroupTabsLayout() {
   const { colors } = useTheme();
