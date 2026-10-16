@@ -158,6 +158,7 @@ export default function HomeScreen() {
                 amount={formatAmount(data.data.summary.totalExpenses)}
                 currency={group?.currency}
                 periodLabel={periodLabel}
+                comparison={period === "all_time" ? null : data.data.spendingComparison}
                 dateRange={data.data.period?.startDate && data.data.period.endDate
                   ? `${data.data.period.startDate} – ${data.data.period.endDate} · UTC`
                   : undefined}

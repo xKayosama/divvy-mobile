@@ -1442,3 +1442,26 @@ test("category shortcuts validate and preserve dashboard period bounds, includin
     { category: "FOOD", startDate: "2026-10-31", endDate: "2026-10-01" },
   ]) assert.deepEqual(expenseFiltersFromParams(params), {});
 });
+
+test("spending comparison labels handle direction, zero baselines, in-progress months and missing data", () => {
+  const { spendingComparisonText } = require("../src/features/dashboard/spendingComparison.ts");
+  const base = {
+    current: { isInProgress: true }, previous: { startDate: "2026-09-01", amount: 2500 },
+    difference: -500, percentageChange: -20, direction: "decrease",
+  };
+  let text = spendingComparisonText(base, "PHP");
+  assert.equal(text.headline, "PHP 500.00 less than September 2026");
+  assert.match(text.detail, /2,500.00.*20% decrease/);
+  assert.match(text.context, /still in progress/);
+  text = spendingComparisonText({ ...base, difference: 500, percentageChange: 20, direction: "increase", current: { isInProgress: false } }, "PHP");
+  assert.match(text.headline, /500.00 more/); assert.match(text.detail, /20% increase/);
+  assert.doesNotMatch(text.context, /in progress/);
+  text = spendingComparisonText({ ...base, difference: 0, percentageChange: 0, direction: "unchanged" });
+  assert.equal(text.headline, "No change from September 2026");
+  assert.match(text.detail, /0% change/);
+  text = spendingComparisonText({ ...base, previous: { ...base.previous, amount: 0 }, percentageChange: null });
+  assert.doesNotMatch(text.detail, /NaN|Infinity|%/);
+  assert.match(text.detail, /No prior spending/);
+  assert.equal(spendingComparisonText(null), null);
+  assert.equal(spendingComparisonText(undefined), null);
+});

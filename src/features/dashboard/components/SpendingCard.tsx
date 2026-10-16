@@ -3,9 +3,13 @@ import { useTheme } from "@/theme/ThemeProvider";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, View } from "react-native";
 
-type Props = { amount: string; currency?: string; periodLabel?: string; dateRange?: string };
+import type { SpendingComparison } from "../types";
+import { spendingComparisonText } from "../spendingComparison";
 
-export default function SpendingCard({ amount, currency, periodLabel = "All time", dateRange }: Props) {
+type Props = { amount: string; currency?: string; periodLabel?: string; dateRange?: string; comparison?: SpendingComparison | null };
+
+export default function SpendingCard({ amount, currency, periodLabel = "All time", dateRange, comparison }: Props) {
+  const comparisonText = spendingComparisonText(comparison, currency);
   const { brandGradients } = useTheme();
   const gradient = `linear-gradient(125deg, ${brandGradients.spending.join(", ")})`;
 
@@ -124,6 +128,21 @@ export default function SpendingCard({ amount, currency, periodLabel = "All time
           {amount}
         </Text>
       </View>
+      {comparisonText ? (
+        <View style={{ gap: 6, paddingBottom: 18 }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 7 }}>
+            <Ionicons
+              name={comparison?.direction === "increase" ? "trending-up-outline" : comparison?.direction === "decrease" ? "trending-down-outline" : "remove-outline"}
+              size={18}
+              color="#B6F3DB"
+              accessible={false}
+            />
+            <Text style={{ flex: 1, color: "#FFFFFF", fontSize: 13, fontWeight: "600" }}>{comparisonText.headline}</Text>
+          </View>
+          <Text style={{ color: "#D3EDE2", fontSize: 12 }}>{comparisonText.detail}</Text>
+          <Text style={{ color: "#B6F3DB", fontSize: 11 }}>{comparisonText.context}</Text>
+        </View>
+      ) : null}
       <View
         style={{
           flexDirection: "row",

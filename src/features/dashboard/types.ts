@@ -50,6 +50,16 @@ export type SpendingCategory = {
   percentage: number;
 };
 
+export type SpendingComparison = {
+  timeZone: "UTC";
+  basis: "calendar_month";
+  current: { startDate: string; endDate: string; amount: number; isInProgress: boolean };
+  previous: { startDate: string; endDate: string; amount: number };
+  difference: number;
+  percentageChange: number | null;
+  direction: "increase" | "decrease" | "unchanged";
+};
+
 export type DashboardSummaryResponse = {
   code: number;
   success: true;
@@ -62,6 +72,7 @@ export type DashboardSummaryResponse = {
       endDate: string | null;
     };
     spendingByCategory?: SpendingCategory[];
+    spendingComparison?: SpendingComparison | null;
     summary: {
       totalExpenses: number;
       totalPaid: number;
