@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/text";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -8,6 +8,8 @@ type Props = {
   pendingCount: number;
   overdueAmount: string;
   overdueCount: number;
+  onOpenPending: () => void;
+  onOpenOverdue: () => void;
 };
 
 export default function BillSummaryCards({
@@ -15,6 +17,8 @@ export default function BillSummaryCards({
   pendingCount,
   overdueAmount,
   overdueCount,
+  onOpenPending,
+  onOpenOverdue,
 }: Props) {
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
@@ -23,12 +27,14 @@ export default function BillSummaryCards({
         amount={pendingAmount}
         count={pendingCount}
         overdue={false}
+        onPress={onOpenPending}
       />
       <BillCard
         title="Overdue bills"
         amount={overdueAmount}
         count={overdueCount}
         overdue
+        onPress={onOpenOverdue}
       />
     </View>
   );
@@ -39,19 +45,27 @@ function BillCard({
   amount,
   count,
   overdue,
+  onPress,
 }: {
   title: string;
   amount: string;
   count: number;
   overdue: boolean;
+  onPress?: () => void;
 }) {
   const { colors, statusColors, surfaces } = useTheme();
   const palette = statusColors[overdue ? "OVERDUE" : "PENDING"];
   const active = count > 0;
   const accent = active ? palette.foreground : colors.mutedForeground;
 
+  const Container = onPress ? Pressable : View;
+
   return (
-    <View
+    <Container
+      onPress={onPress}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={onPress ? `View ${overdue ? "overdue" : "pending"} bills, ${count} ${count === 1 ? "bill" : "bills"}` : undefined}
+      className={onPress ? "active:opacity-70" : undefined}
       style={{
         ...surfaces.card,
         flexGrow: 1,
@@ -87,6 +101,7 @@ function BillCard({
         >
           {title}
         </Text>
+        {onPress ? <Ionicons name="arrow-forward" size={18} color={colors.primary} accessible={false} /> : null}
       </View>
       <Text
         numberOfLines={1}
@@ -120,6 +135,6 @@ function BillCard({
               : "Nothing due"}
         </Text>
       </View>
-    </View>
+    </Container>
   );
 }

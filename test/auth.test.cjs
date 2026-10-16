@@ -1355,3 +1355,35 @@ test("Bills Fast Refresh replaces an older status-only endpoint", async () => {
     else global.__DEV__ = previousDev;
   }
 });
+
+test("paying a reminder bill refreshes dashboard reminder counts and previews", async () => {
+  signedIn();
+  let paid = false;
+  let reads = 0;
+  global.fetch = async (request) => {
+    const url = new URL(request.url);
+    if (request.method === "PUT") {
+      assert.equal(url.pathname, "/api/bills/b1");
+      assert.deepEqual(await request.json(), { status: "PAID", paidBy: "u1" });
+      paid = true;
+      return respond(200, { success: true, data: { bill: { _id: "b1", status: "PAID" } } });
+    }
+    assert.equal(url.pathname, "/api/groups/g1/dashboard");
+    reads++;
+    const empty = { count: 0, amount: 0, bills: [] };
+    return respond(200, { success: true, data: { billReminders: {
+      asOf: "2026-10-16T12:00:00.000Z", timeZone: "UTC", windowDays: 7,
+      overdue: paid ? empty : { count: 1, amount: 100, bills: [{ _id: "b1", name: "Rent", amount: 100, dueDate: "2026-10-15", status: "OVERDUE" }] },
+      dueToday: empty, dueSoon: empty,
+    } } });
+  };
+  const query = store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1"));
+  try {
+    assert.equal((await query.unwrap()).data.billReminders.overdue.count, 1);
+    await store.dispatch(billsApi.endpoints.markBillPaid.initiate({ groupId: "g1", billId: "b1", paidBy: "u1" })).unwrap();
+    await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(item => item.unwrap()));
+    const result = dashboardApi.endpoints.getGroupDashboard.select("g1")(store.getState());
+    assert.equal(reads, 2);
+    assert.deepEqual(result.data.data.billReminders.overdue, { count: 0, amount: 0, bills: [] });
+  } finally { query.unsubscribe(); }
+});

@@ -15,9 +15,10 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { useDeleteBillMutation, useGetGroupBillsQuery } from "../billsApi";
 import { billCategories } from "../billForm";
 import BillFiltersModal, { type BillFilters } from "../components/BillFiltersModal";
+import type { BillStatus } from "../types";
 import BillStatusBadge from "../components/BillStatusBadge";
 
-export default function BillsScreen({ groupId }: { groupId: string }) {
+export default function BillsScreen({ groupId, initialStatus }: { groupId: string; initialStatus?: BillStatus }) {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
@@ -70,7 +71,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
     setDeleteError("");
   }
 
-  const [filters, setFilters] = useState<BillFilters>({});
+  const [filters, setFilters] = useState<BillFilters>(initialStatus ? { status: initialStatus } : {});
   const [showFilters, setShowFilters] = useState(false);
   const hasFilters = !!(
     filters.category ||

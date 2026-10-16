@@ -23,6 +23,21 @@ export type UpcomingBill = {
   recurrence: "WEEKLY" | "MONTHLY" | "YEARLY" | null;
 };
 
+export type BillReminderGroup = {
+  count: number;
+  amount: number;
+  bills: UpcomingBill[];
+};
+
+export type BillReminders = {
+  asOf: string;
+  timeZone: "UTC";
+  windowDays: 7;
+  overdue: BillReminderGroup;
+  dueToday: BillReminderGroup;
+  dueSoon: BillReminderGroup;
+};
+
 export type DashboardSummaryResponse = {
   code: number;
   success: true;
@@ -44,5 +59,6 @@ export type DashboardSummaryResponse = {
     };
     balances: MemberBalance[];
     upcomingBills: UpcomingBill[];
+    billReminders?: BillReminders;
   };
 };
