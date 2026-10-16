@@ -259,7 +259,6 @@ export default function CreateExpenseScreen({
                 <Button
                   variant="outline"
                   size="icon"
-                  className="rounded-full"
                   accessibilityLabel="Back to expenses"
                   disabled={saving}
                   onPress={returnToExpenses}

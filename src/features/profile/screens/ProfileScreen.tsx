@@ -59,7 +59,7 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
           <View className="flex-row items-center gap-3">
             {!inTabs ? <Button
               variant="outline"
-              className="h-12 w-12 rounded-full p-0"
+              size="icon"
               accessibilityLabel="Go back"
               disabled={busy}
               onPress={() => {
@@ -69,7 +69,7 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
             >
               <Ionicons
                 name="arrow-back"
-                size={21}
+                size={22}
                 color={colors.foreground}
                 accessible={false}
               />

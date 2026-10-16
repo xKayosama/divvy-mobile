@@ -102,7 +102,6 @@ export default function CreateBillScreen({
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full"
                 accessibilityLabel="Back to bills"
                 disabled={saving}
                 onPress={back}

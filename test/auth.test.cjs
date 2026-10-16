@@ -652,3 +652,256 @@ for (const operation of ["updateBill", "deleteBill"]) {
     }
   });
 }
+
+const { groupsApi } = require("../src/features/groups/groupsApi.ts");
+
+test("adding a member normalizes the email and refreshes membership and dashboard caches", async () => {
+  signedIn();
+  let added = false;
+  const reads = { members: 0, groups: 0, dashboard: 0 };
+  global.fetch = async (request) => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    if (request.method === "POST") {
+      assert.equal(request.url, "https://divvy.test/api/groups/g1/members");
+      assert.deepEqual(await request.json(), { email: "new@example.com" });
+      added = true;
+      return respond(201, {
+        success: true,
+        data: {
+          member: {
+            id: "u2",
+            firstName: "New",
+            lastName: "Member",
+            email: "new@example.com",
+            role: "MEMBER",
+          },
+        },
+      });
+    }
+    if (request.url.endsWith("/members")) {
+      reads.members++;
+      return respond(200, {
+        success: true,
+        data: {
+          members: added
+            ? [{ _id: "m2", userId: { _id: "u2" }, status: "ACTIVE" }]
+            : [],
+        },
+      });
+    }
+    if (request.url.endsWith("/dashboard")) {
+      reads.dashboard++;
+      return respond(200, { success: true, data: {} });
+    }
+    reads.groups++;
+    return respond(200, { success: true, data: { groups: [] } });
+  };
+  const queries = [
+    store.dispatch(groupsApi.endpoints.getGroupMembers.initiate("g1")),
+    store.dispatch(groupsApi.endpoints.getMyGroups.initiate()),
+    store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+  ];
+  try {
+    await Promise.all(queries.map((query) => query.unwrap()));
+    await store
+      .dispatch(
+        groupsApi.endpoints.addGroupMember.initiate({
+          groupId: "g1",
+          email: " New@Example.COM ",
+        }),
+      )
+      .unwrap();
+    await Promise.all(
+      store
+        .dispatch(api.util.getRunningQueriesThunk())
+        .map((query) => query.unwrap()),
+    );
+    assert.deepEqual(reads, { members: 2, groups: 2, dashboard: 2 });
+    assert.equal(
+      groupsApi.endpoints.getGroupMembers.select("g1")(store.getState()).data
+        .data.members[0].userId._id,
+      "u2",
+    );
+  } finally {
+    queries.forEach((query) => query.unsubscribe());
+  }
+});
+
+for (const status of [403, 404, 409]) {
+  test(`add member surfaces ${status} without changing the member list`, async () => {
+    signedIn();
+    let reads = 0;
+    global.fetch = async (request) => {
+      if (request.method === "GET") {
+        reads++;
+        return respond(200, { success: true, data: { members: [] } });
+      }
+      return respond(status, {
+        success: false,
+        message: "Cannot add this member.",
+      });
+    };
+    const query = store.dispatch(
+      groupsApi.endpoints.getGroupMembers.initiate("g1"),
+    );
+    try {
+      await query.unwrap();
+      await assert.rejects(
+        store
+          .dispatch(
+            groupsApi.endpoints.addGroupMember.initiate({
+              groupId: "g1",
+              email: "new@example.com",
+            }),
+          )
+          .unwrap(),
+        (error) =>
+          error.status === status &&
+          error.data.message === "Cannot add this member.",
+      );
+      assert.equal(reads, 1);
+      assert.deepEqual(
+        groupsApi.endpoints.getGroupMembers.select("g1")(store.getState()).data
+          .data.members,
+        [],
+      );
+    } finally {
+      query.unsubscribe();
+    }
+  });
+}
+
+for (const operation of ["renameGroup", "removeGroupMember"]) {
+  test(`${operation} sends the verified contract and refreshes group data`, async () => {
+    signedIn();
+    let changed = false;
+    const reads = { groups: 0, members: 0, dashboard: 0 };
+    global.fetch = async (request) => {
+      assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+      if (request.method !== "GET") {
+        assert.equal(
+          request.url,
+          operation === "renameGroup"
+            ? "https://divvy.test/api/groups/g1"
+            : "https://divvy.test/api/groups/g1/members/u2",
+        );
+        assert.equal(
+          request.method,
+          operation === "renameGroup" ? "PUT" : "DELETE",
+        );
+        if (operation === "renameGroup")
+          assert.deepEqual(await request.json(), { name: "Our home" });
+        else assert.equal(await request.text(), "");
+        changed = true;
+        return respond(200, {
+          success: true,
+          message: "Updated",
+          data: { group: { _id: "g1", name: "Our home" } },
+        });
+      }
+      if (request.url.endsWith("/members")) {
+        reads.members++;
+        return respond(200, {
+          success: true,
+          data: {
+            members:
+              changed && operation === "removeGroupMember"
+                ? []
+                : [{ userId: { _id: "u2" } }],
+          },
+        });
+      }
+      if (request.url.endsWith("/dashboard")) {
+        reads.dashboard++;
+        return respond(200, { success: true, data: {} });
+      }
+      reads.groups++;
+      return respond(200, {
+        success: true,
+        data: { groups: [{ id: "g1", name: changed ? "Our home" : "Home" }] },
+      });
+    };
+    const queries = [
+      store.dispatch(groupsApi.endpoints.getMyGroups.initiate()),
+      store.dispatch(groupsApi.endpoints.getGroupMembers.initiate("g1")),
+      store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+    ];
+    try {
+      await Promise.all(queries.map((query) => query.unwrap()));
+      await store
+        .dispatch(
+          groupsApi.endpoints[operation].initiate({
+            groupId: "g1",
+            userId: "u2",
+            name: " Our home ",
+          }),
+        )
+        .unwrap();
+      await Promise.all(
+        store
+          .dispatch(api.util.getRunningQueriesThunk())
+          .map((query) => query.unwrap()),
+      );
+      assert.deepEqual(reads, {
+        groups: 2,
+        members: 2,
+        dashboard: operation === "removeGroupMember" ? 2 : 1,
+      });
+      if (operation === "renameGroup")
+        assert.equal(
+          groupsApi.endpoints.getMyGroups.select()(store.getState()).data.data
+            .groups[0].name,
+          "Our home",
+        );
+      else
+        assert.deepEqual(
+          groupsApi.endpoints.getGroupMembers.select("g1")(store.getState())
+            .data.data.members,
+          [],
+        );
+    } finally {
+      queries.forEach((query) => query.unsubscribe());
+    }
+  });
+  test(`${operation} preserves cached group data when access is denied`, async () => {
+    signedIn();
+    let reads = 0;
+    global.fetch = async (request) => {
+      if (request.method === "GET") {
+        reads++;
+        return respond(200, {
+          success: true,
+          data: { groups: [{ id: "g1", name: "Home" }] },
+        });
+      }
+      return respond(403, {
+        success: false,
+        message: "Only the group owner can perform this action.",
+      });
+    };
+    const query = store.dispatch(groupsApi.endpoints.getMyGroups.initiate());
+    try {
+      await query.unwrap();
+      await assert.rejects(
+        store
+          .dispatch(
+            groupsApi.endpoints[operation].initiate({
+              groupId: "g1",
+              userId: "u2",
+              name: "Changed",
+            }),
+          )
+          .unwrap(),
+        (error) => error.status === 403,
+      );
+      assert.equal(reads, 1);
+      assert.equal(
+        groupsApi.endpoints.getMyGroups.select()(store.getState()).data.data
+          .groups[0].name,
+        "Home",
+      );
+    } finally {
+      query.unsubscribe();
+    }
+  });
+}

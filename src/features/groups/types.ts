@@ -65,3 +65,18 @@ export type GroupMembersResponse = {
     members: GroupMember[];
   };
 };
+
+export type AddGroupMemberResponse = {
+  success: true;
+  message: string;
+  data: {
+    member: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: "MEMBER";
+      joinedAt: string;
+    };
+  };
+};

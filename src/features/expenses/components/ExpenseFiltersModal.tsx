@@ -62,7 +62,6 @@ export default function ExpenseFiltersModal({
               <Button
                 variant="outline"
                 size="icon"
-                className="rounded-full"
                 accessibilityLabel="Back to expenses"
                 onPress={onClose}
               >

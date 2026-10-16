@@ -42,6 +42,17 @@ Mobile authentication now has typed responses, native secure token persistence (
 
 Keep credentials, tokens, and environment secrets out of this document.
 
+## Group members (verified 2026-10-16)
+
+Source: `src/modules/groups/group.routes.js`, `group.controller.js`, and `groupAccess.middleware.js`.
+
+- `GET /api/groups/:id/members`: bearer authentication and ACTIVE membership. Returns HTTP 200 with `data.members`, containing active membership records populated at `userId` with firstName, lastName, email, avatar. Mobile displays owner first, role badges, and the current user's label; missing user references have an unavailable-account fallback.
+- `POST /api/groups/:id/members`: requires an ACTIVE OWNER membership; body `{ email }`. Adds an already registered user directly, without an invitation/email step. Mobile trims/lowercases the email before sending. HTTP 201 returns `data.member: { id, firstName, lastName, email, role, joinedAt }`; `id` is the user ID, not the membership ID. An INACTIVE membership is reactivated instead of duplicated.
+- Nonowners return 403, unregistered emails 404, and existing active members 409. Mobile preserves form state on errors and confirms success by name. Successful addition refreshes group/member caches (including expense/bill payer selections) and the group's dashboard.
+- `DELETE /api/groups/:id/members/:userId`: ACTIVE OWNER only, using the user's ID rather than the membership ID. Sets membership to INACTIVE; HTTP 200 returns `{ success: true, message }`. Owner self-removal returns 400, missing active membership 404, nonowner 403. Prior expense/bill records are retained. Removal does not record a settlement. Mobile requires a named confirmation, blocks owner/self-removal, and refreshes group/member and dashboard caches on success.
+- `PUT /api/groups/:id`: ACTIVE group membership plus `group.ownerId === current user` required. Renaming sends only `{ name }`, trimmed and nonempty. HTTP 200 returns `data.group`; blank names return 400, nonowners 403. Mobile settings prefill the current name and refresh group caches after saving. Currency is shown read-only.
+- Removal/renaming reverified against current routes/controllers on 2026-10-16. Direct mobile management routes check owner membership as well as hiding controls from regular members; backend authorization remains authoritative. Forms preserve input after errors and guard against duplicate submissions.
+
 ## Bill creation and payment (verified 2026-10-15)
 
 Source: `src/modules/bills/bill.routes.js`, `bill.controller.js`, `Bill.js`, group access middleware, and `src/app.js` mounts.
