@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, View } from "react-native";
 
+import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/brand/Brand";
 import { Text } from "@/components/ui/text";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -9,19 +10,28 @@ type Props = {
   groupName: string;
   currency?: string;
   onSwitchGroup: () => void;
+  onOpenProfile: () => void;
 };
 
 export default function DashboardHeader({
   groupName,
   currency,
   onSwitchGroup,
+  onOpenProfile,
 }: Props) {
   const { colors, surfaces } = useTheme();
   return (
     <View className="gap-5">
       <View className="flex-row items-center justify-between">
         <Brand />
-
+        <Button
+          variant="outline"
+          size="icon"
+          accessibilityLabel="Open profile"
+          onPress={onOpenProfile}
+        >
+          <Ionicons name="person-outline" size={22} color={colors.foreground} accessible={false} />
+        </Button>
       </View>
 
       <Pressable

@@ -73,6 +73,10 @@ export default function HomeScreen() {
             groupName={group?.name ?? "Your group"}
             currency={group?.currency}
             onSwitchGroup={() => router.replace("/groups")}
+            onOpenProfile={() => {
+              if (groupId) router.navigate({ pathname: "/groups/[groupId]/profile", params: { groupId } });
+              else router.push("/profile");
+            }}
           />
 
           {!groupId ? (

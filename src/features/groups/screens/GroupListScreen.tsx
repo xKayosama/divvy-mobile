@@ -7,15 +7,12 @@ import { Brand } from "@/components/brand/Brand";
 import ScreenBackground from "@/components/layout/ScreenBackground";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { useAppSelector } from "@/hooks/redux";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useGetMyGroupsQuery } from "../groupsApi";
 
 export default function GroupListScreen() {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
-  const user = useAppSelector((state) => state.auth.user);
   const { data, isLoading, isFetching, isError, refetch } = useGetMyGroupsQuery();
 
   return (
@@ -32,9 +29,9 @@ export default function GroupListScreen() {
           <View className="mb-6 gap-6">
             <View className="flex-row items-center justify-between">
               <Brand />
-              <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={() => router.push("/profile")}>
-                <UserAvatar firstName={user?.firstName} lastName={user?.lastName} />
-              </Pressable>
+              <Button variant="outline" size="icon" accessibilityLabel="Open profile" onPress={() => router.push("/profile")}>
+                <Ionicons name="person-outline" size={22} color={colors.foreground} accessible={false} />
+              </Button>
             </View>
             <View className="gap-2">
               <Text className="text-xs font-semibold text-secondary-foreground" style={{ letterSpacing: 2 }}>SHARED SPACES</Text>

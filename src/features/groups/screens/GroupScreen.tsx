@@ -57,7 +57,12 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
         ListHeaderComponent={
           <View className="mb-3 gap-5">
             <View className="gap-2">
-              <Text className="text-3xl font-semibold">Group</Text>
+              <View className="flex-row items-center justify-between gap-3">
+                <Text className="text-3xl font-semibold">Group</Text>
+                <Button variant="outline" size="icon" accessibilityLabel="Open profile" onPress={() => router.navigate({ pathname: "/groups/[groupId]/profile", params: { groupId } })}>
+                  <Ionicons name="person-outline" size={22} color={colors.foreground} accessible={false} />
+                </Button>
+              </View>
               <Text className="text-sm text-muted-foreground">
                 Your people. Shared together.
               </Text>
