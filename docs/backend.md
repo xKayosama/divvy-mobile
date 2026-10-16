@@ -42,6 +42,18 @@ Mobile authentication now has typed responses, native secure token persistence (
 
 Keep credentials, tokens, and environment secrets out of this document.
 
+## Mobile receipt scanning (verified 2026-10-16)
+
+Source: `src/modules/receipts/receipt.{routes,controller,schema,upload,ocr}.js` and backend README.
+
+- `POST /api/groups/:id/receipts/scan` requires a bearer token and ACTIVE membership. Send multipart FormData with exactly one file under `receipt`, without other form fields. Do not set Content-Type manually; the runtime generates the multipart boundary. Maximum 10 MiB; JPEG, PNG, WebP and PDF supported by the backend, with content signatures validated.
+- HTTP 200: `{ success: true, message, data: { groupId, requiresReview: true, receipt } }`. Receipt fields: `isReceipt`, nullable merchant/date/currency/subtotal/tax/tip/total, items with nullable description/quantity/unitPrice/total, and warnings. Date is YYYY-MM-DD; currency is a three-letter code. No expense is created, no image attachment is persisted, and no public file URL is returned.
+- Errors include 413 too large, 415 unsupported/mismatched content, 422 unreadable/nonreceipt, 429 throttling, 503 PDF renderer unavailable, 504 OCR timeout. Backend OCR has a 60-second deadline; the mobile upload overrides the default request timeout to 75 seconds and aborts when leaving the scan screen.
+- Mobile supports taking a photo on native and selecting an image on native/web using SDK-compatible Expo ImagePicker. Images are normalized to JPEG with ImageManipulator, capped at 2400 pixels on the longest side, and checked against the upload limit. PDF selection is not currently exposed in mobile. The camera asks permission when used; the system image picker does not request broad photo-library access. Native camera/photo permission descriptions are configured through the plugin, with microphone permission disabled.
+- SDK 57 installs `expo/fetch` as global fetch on native. Its multipart encoder does not support legacy React Native `{ uri, name, type }` objects. Native uploads append an `expo-file-system` File so the encoder can read its bytes; web uploads append a Blob. The upload helper checks file existence and size. Regression coverage runs the actual installed Expo multipart encoder against the new File-compatible object and verifies that the old descriptor is rejected.
+- Scanning prefills an editable expense form with merchant description, total, date and item descriptions in notes. Missing totals/dates remain blank and require entry. Source photo, item details, subtotal/tax/tip, and warnings remain visible for comparison. Category, payer, participants and split are chosen by the user. Explicit review acknowledgement is required; a currency mismatch prompts entry of an amount in the group's currency, with no automatic exchange conversion. Saving uses the existing expense endpoint and cache invalidation.
+- Both added modules are included in Expo Go. Existing custom development builds need rebuilding to include the packages and permission configuration. No native folders are edited manually.
+
 ## Settlements and repayments (verified 2026-10-16)
 
 Source: backend commit `3469c76`, `src/modules/settlements/{Settlement.js,settlement.routes.js,settlement.controller.js,settlement.balances.js}`, balance and dashboard controllers.

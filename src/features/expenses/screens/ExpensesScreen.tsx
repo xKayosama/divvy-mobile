@@ -121,6 +121,24 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
           <Text>Add expense</Text>
         </Button>
 
+        <Button
+          variant="outline"
+          onPress={() =>
+            router.push({
+              pathname: "/groups/[groupId]/expenses/scan",
+              params: { groupId },
+            })
+          }
+        >
+          <Ionicons
+            name="scan-outline"
+            size={20}
+            color={colors.primary}
+            accessible={false}
+          />
+          <Text>Scan receipt</Text>
+        </Button>
+
         <View className="flex-row items-center gap-3">
           <Button
             variant="outline"

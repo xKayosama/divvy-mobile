@@ -5,6 +5,8 @@ Authentication, group listing/creation, member viewing, owner-only member additi
 
 Settle up shows suggested repayments, records payments sent by the current member, and displays paginated payment history. Repayments update dashboard balances separately from purchase totals.
 
+Receipt scanning supports camera photos and image selection, then requires review of extracted values in the expense form before saving. Existing custom development builds need rebuilding after installing the image picker/manipulator modules.
+
 See the [developer guide](docs/developer-guide.md) for setup, architecture, workflows, and troubleshooting.
 
 - [Backend integration context](docs/backend.md)

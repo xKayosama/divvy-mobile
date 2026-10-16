@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -14,6 +15,8 @@ import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import DateField from "@/components/ui/date-field";
 import { Text } from "@/components/ui/text";
+import type { ReceiptExtraction } from "@/features/receipts/types";
+import { receiptDraft } from "@/features/receipts/receiptDraft";
 import { authError } from "@/features/auth/errors";
 import {
   useGetGroupMembersQuery,
@@ -35,13 +38,23 @@ function calendarDate(value: Date) {
 export default function CreateExpenseScreen({
   groupId,
   expense,
+  receipt,
+  receiptImageUri,
 }: {
   groupId: string;
   expense?: Expense;
+  receipt?: ReceiptExtraction;
+  receiptImageUri?: string;
 }) {
   const { colors } = useTheme();
-  const [description, setDescription] = useState(expense?.description ?? "");
-  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const draft = receipt ? receiptDraft(receipt) : undefined;
+  const [receiptReviewed, setReceiptReviewed] = useState(false);
+  const [description, setDescription] = useState(
+    expense?.description ?? draft?.description ?? "",
+  );
+  const [amount, setAmount] = useState(
+    expense ? String(expense.amount) : (draft?.amount ?? ""),
+  );
   const [category, setCategory] = useState<ExpenseCategory>(
     expense?.category ?? "OTHERS",
   );
@@ -63,9 +76,11 @@ export default function CreateExpenseScreen({
     ),
   );
   const [date, setDate] = useState(() => {
-    return calendarDate(expense ? new Date(expense.date) : new Date());
+    return draft
+      ? draft.date
+      : calendarDate(expense ? new Date(expense.date) : new Date());
   });
-  const [notes, setNotes] = useState(expense?.notes ?? "");
+  const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
   const [message, setMessage] = useState("");
   const submitting = useRef(false);
 
@@ -111,6 +126,12 @@ export default function CreateExpenseScreen({
     if (submitting.current) return;
 
     setMessage("");
+    if (receipt && (!group || !receiptReviewed)) {
+      setMessage(
+        "Review the extracted details and confirm the amount is in your group currency before saving.",
+      );
+      return;
+    }
 
     const normalizedAmount = amount.trim().replace(",", ".");
     const numericAmount = Number(normalizedAmount);
@@ -271,7 +292,11 @@ export default function CreateExpenseScreen({
                   />
                 </Button>
                 <Text className="flex-1 text-3xl font-semibold tracking-tight">
-                  {expense ? "Edit expense" : "Add expense"}
+                  {expense
+                    ? "Edit expense"
+                    : receipt
+                      ? "Review receipt"
+                      : "Add expense"}
                 </Text>
               </View>
               <Text className="text-sm text-muted-foreground">
@@ -279,6 +304,108 @@ export default function CreateExpenseScreen({
                 {group ? ` · ${group.currency}` : ""}
               </Text>
             </View>
+
+            {receipt ? (
+              <View className="gap-3 rounded-[24px] border border-border bg-card p-5">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons
+                    name="scan-outline"
+                    size={20}
+                    color={colors.primary}
+                    accessible={false}
+                  />
+                  <Text className="font-semibold">Check before saving</Text>
+                </View>
+                {receiptImageUri ? (
+                  <Image
+                    source={{ uri: receiptImageUri }}
+                    contentFit="contain"
+                    style={{ width: "100%", height: 180, borderRadius: 12 }}
+                    accessibilityLabel="Receipt photo for comparison"
+                  />
+                ) : null}
+                <Text className="text-sm leading-5 text-muted-foreground">
+                  Review the description, total, date, payer, and split below.
+                  Missing details must be filled in.
+                </Text>
+                <Text className="text-sm text-muted-foreground">
+                  Receipt currency: {receipt.currency ?? "Not detected"} · Group
+                  currency: {group?.currency ?? "Loading…"}
+                </Text>
+                {receipt.currency &&
+                group &&
+                receipt.currency !== group.currency ? (
+                  <Text className="text-sm text-destructive">
+                    The currencies differ. Enter the correct amount in{" "}
+                    {group.currency}; no currency conversion is applied.
+                  </Text>
+                ) : null}
+                {[
+                  ["Subtotal", receipt.subtotal],
+                  ["Tax", receipt.tax],
+                  ["Tip", receipt.tip],
+                ].map(([label, value]) =>
+                  value != null ? (
+                    <Text
+                      key={String(label)}
+                      className="text-xs text-muted-foreground"
+                    >
+                      {label}: {String(value)}
+                    </Text>
+                  ) : null,
+                )}
+                {receipt.items.length > 0 ? (
+                  <View className="gap-2 border-t border-border pt-3">
+                    <Text className="text-sm font-semibold">Scanned items</Text>
+                    {receipt.items.slice(0, 30).map((item, index) => (
+                      <View key={index} className="flex-row gap-3">
+                        <Text className="flex-1 text-xs text-muted-foreground">
+                          {item.quantity != null ? `${item.quantity} × ` : ""}
+                          {item.description ?? "Unidentified item"}
+                        </Text>
+                        <Text className="text-xs text-muted-foreground">
+                          {item.total != null ? item.total.toFixed(2) : "—"}
+                        </Text>
+                      </View>
+                    ))}
+                    {receipt.items.length > 30 ? (
+                      <Text className="text-xs text-muted-foreground">
+                        Showing the first 30 items. Descriptions are included in
+                        the editable notes below.
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {receipt.warnings.map((warning, index) => (
+                  <Text
+                    key={index}
+                    className="text-xs leading-5 text-muted-foreground"
+                  >
+                    {warning}
+                  </Text>
+                ))}
+                <Button
+                  variant={receiptReviewed ? "secondary" : "outline"}
+                  disabled={saving || !group}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: receiptReviewed }}
+                  onPress={() => setReceiptReviewed((value) => !value)}
+                >
+                  <Ionicons
+                    name={
+                      receiptReviewed ? "checkbox-outline" : "square-outline"
+                    }
+                    size={20}
+                    color={colors.primary}
+                    accessible={false}
+                  />
+                  <Text className="flex-1">
+                    I checked these details and the amount is in{" "}
+                    {group?.currency ?? "the group currency"}.
+                  </Text>
+                </Button>
+              </View>
+            ) : null}
 
             {loadingMembers ? (
               <ActivityIndicator accessibilityLabel="Loading members" />
@@ -503,7 +630,11 @@ export default function CreateExpenseScreen({
 
                 <Button
                   className="h-14 rounded-2xl"
-                  disabled={saving || members.length === 0}
+                  disabled={
+                    saving ||
+                    members.length === 0 ||
+                    (!!receipt && (!group || !receiptReviewed))
+                  }
                   onPress={handleSave}
                 >
                   <Text>{saving ? "Saving…" : "Save expense"}</Text>

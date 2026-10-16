@@ -1126,3 +1126,182 @@ test("settled payment conflicts refresh history and suggestions", async () => {
     queries.forEach((query) => query.unsubscribe());
   }
 });
+
+const { receiptsApi } = require("../src/features/receipts/receiptsApi.ts");
+const { receiptDraft } = require("../src/features/receipts/receiptDraft.ts");
+const extractedReceipt = {
+  isReceipt: true,
+  merchant: "  Corner store  ",
+  date: "2026-10-15",
+  currency: "PHP",
+  subtotal: 90,
+  tax: 10,
+  tip: null,
+  total: 100,
+  items: [{ description: " Milk ", quantity: 1, unitPrice: 100, total: 100 }],
+  warnings: ["Check extracted values"],
+};
+
+test("receipt draft uses extracted total without inventing missing amounts or dates", () => {
+  assert.deepEqual(receiptDraft(extractedReceipt), {
+    description: "Corner store",
+    amount: "100.00",
+    date: "2026-10-15",
+    notes: "Milk",
+  });
+  for (const total of [null, 0, -1, NaN])
+    assert.equal(receiptDraft({ ...extractedReceipt, total }).amount, "");
+  for (const date of [null, "2026-02-29", "bad-date"])
+    assert.equal(receiptDraft({ ...extractedReceipt, date }).date, "");
+  assert.equal(
+    receiptDraft({
+      ...extractedReceipt,
+      merchant: null,
+      total: null,
+      date: null,
+    }).description,
+    "",
+  );
+});
+
+test("receipt scanning sends exactly one multipart file and never creates an expense", async () => {
+  signedIn();
+  let requests = 0;
+  const body = new FormData();
+  body.append(
+    "receipt",
+    new Blob([new Uint8Array([255, 216, 255])], { type: "image/jpeg" }),
+    "receipt.jpg",
+  );
+  global.fetch = async (request) => {
+    requests++;
+    assert.equal(request.url, "https://divvy.test/api/groups/g1/receipts/scan");
+    assert.equal(request.method, "POST");
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    assert.match(
+      request.headers.get("Content-Type"),
+      /^multipart\/form-data; boundary=/,
+    );
+    const form = await request.formData();
+    assert.deepEqual([...form.keys()], ["receipt"]);
+    const file = form.get("receipt");
+    assert.equal(file.name, "receipt.jpg");
+    assert.equal(file.type, "image/jpeg");
+    return respond(200, {
+      success: true,
+      data: { groupId: "g1", requiresReview: true, receipt: extractedReceipt },
+    });
+  };
+  const result = await store
+    .dispatch(
+      receiptsApi.endpoints.scanReceipt.initiate({ groupId: "g1", body }),
+    )
+    .unwrap();
+  assert.equal(result.data.requiresReview, true);
+  assert.equal(result.data.receipt.total, 100);
+  assert.equal(requests, 1);
+});
+
+for (const status of [413, 415, 422, 429, 504]) {
+  test(`receipt scan ${status} preserves session and exposes the backend error`, async () => {
+    signedIn();
+    global.fetch = async () =>
+      respond(status, {
+        success: false,
+        message: "Receipt scan could not finish.",
+      });
+    await assert.rejects(
+      store
+        .dispatch(
+          receiptsApi.endpoints.scanReceipt.initiate({
+            groupId: "g1",
+            body: new FormData(),
+          }),
+        )
+        .unwrap(),
+      (error) =>
+        error.status === status &&
+        error.data.message === "Receipt scan could not finish.",
+    );
+    assert.equal(store.getState().auth.token, "saved-token");
+  });
+}
+
+test("native receipt upload is readable by the actual SDK 57 multipart encoder", async () => {
+  const previousLoad = Module._load;
+  const OriginalFormData = global.FormData;
+  const bytes = new Uint8Array([255, 216, 255]);
+  class NativeFile {
+    constructor(uri) {
+      this.uri = uri;
+      this.exists = true;
+      this.size = bytes.length;
+      this.type = "image/jpeg";
+      this.name = "receipt.jpg";
+    }
+    async bytes() {
+      return bytes;
+    }
+  }
+  class NativeFormData {
+    constructor() {
+      this.parts = [];
+    }
+    append(name, value) {
+      this.parts.push([name, value]);
+    }
+    entries() {
+      return this.parts.values();
+    }
+  }
+  Module._load = function (name, parent, isMain) {
+    if (name === "expo-file-system") return { File: NativeFile };
+    return previousLoad.call(this, name, parent, isMain);
+  };
+  try {
+    const {
+      receiptUpload,
+    } = require("../src/features/receipts/receiptUpload.ts");
+    global.FormData = NativeFormData;
+    const {
+      convertFormDataAsync,
+    } = require("../node_modules/expo/src/winter/fetch/convertFormData.ts");
+    const form = await receiptUpload("file:///receipt.jpg");
+    const encoded = await convertFormDataAsync(form, "test-boundary");
+    const text = new TextDecoder().decode(encoded.body);
+    assert.match(text, /name="receipt"; filename="receipt.jpg"/);
+    assert.match(text, /content-type: image\/jpeg/);
+    assert.equal(form.parts[0][1] instanceof NativeFile, true);
+    assert.ok(
+      encoded.body.some(
+        (value, index) => value === 255 && encoded.body[index + 1] === 216,
+      ),
+    );
+    const oldForm = new NativeFormData();
+    oldForm.append("receipt", {
+      uri: "file:///receipt.jpg",
+      name: "receipt.jpg",
+      type: "image/jpeg",
+    });
+    await assert.rejects(
+      convertFormDataAsync(oldForm, "old-boundary"),
+      /Unsupported FormDataPart implementation/,
+    );
+  } finally {
+    Module._load = previousLoad;
+    global.FormData = OriginalFormData;
+  }
+});
+
+test("receipt errors distinguish upload failure from OCR timeout", () => {
+  const { receiptError } = require("../src/features/receipts/receiptError.ts");
+  assert.match(
+    receiptError({ status: "FETCH_ERROR" }),
+    /could not be uploaded/,
+  );
+  assert.match(receiptError({ status: "TIMEOUT_ERROR" }), /timed out/);
+  assert.equal(
+    receiptError({ status: 422, data: { message: "Not a receipt" } }),
+    "Not a receipt",
+  );
+});
