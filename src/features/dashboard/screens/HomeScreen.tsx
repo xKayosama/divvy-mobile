@@ -1,11 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   AppState,
   RefreshControl,
   ScrollView,
+  Pressable,
   View,
 } from "react-native";
 import {
@@ -25,18 +26,28 @@ import DashboardHeader from "../components/DashboardHeader";
 import MemberBalances from "../components/MemberBalances";
 import SpendingCard from "../components/SpendingCard";
 import UpcomingBills from "../components/UpcomingBills";
+import type { DashboardPeriod } from "../types";
 import { useGetGroupDashboardQuery } from "../dashboardApi";
+
+const periods = [
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+  { value: "all_time", label: "All time" },
+] as const;
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
+  const [selection, setSelection] = useState<{ groupId: string; period: DashboardPeriod } | null>(null);
+  const period = selection?.groupId === groupId ? selection.period : "all_time";
+  const periodLabel = periods.find(item => item.value === period)!.label;
   const { data: groupsData } = useGetMyGroupsQuery();
 
   const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
   const { currentData: data, isLoading, isFetching, isError, refetch } =
-    useGetGroupDashboardQuery(groupId, { skip: !groupId });
+    useGetGroupDashboardQuery({ groupId, period }, { skip: !groupId, refetchOnMountOrArgChange: true });
 
   useFocusEffect(useCallback(() => {
     if (!groupId) return;
@@ -106,12 +117,31 @@ export default function HomeScreen() {
             }}
           />
 
+          <View className="gap-2">
+            <Text className="text-sm font-semibold">Spending period</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {periods.map(item => (
+                <Pressable
+                  key={item.value}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: item.value === period }}
+                  onPress={() => setSelection({ groupId, period: item.value })}
+                  className="min-h-11 flex-1 items-center justify-center rounded-xl border px-2 py-3 active:opacity-70"
+                  style={{ minWidth: 84, backgroundColor: item.value === period ? colors.primary : colors.card, borderColor: item.value === period ? colors.primary : colors.border }}
+                >
+                  <Text className="text-xs font-semibold" style={{ color: item.value === period ? colors.primaryForeground : colors.foreground }}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="text-xs text-muted-foreground">UTC calendar months · Balances and bills stay current</Text>
+          </View>
+
           {!groupId ? (
             <Text>No group selected. Return to your groups.</Text>
           ) : isLoading || (!data && isFetching) ? (
             <View className="items-center gap-3 py-10">
               <ActivityIndicator />
-              <Text>Loading dashboard…</Text>
+              <Text>Loading {periodLabel.toLowerCase()} spending…</Text>
             </View>
           ) : isError ? (
             <View className="gap-3">
@@ -126,6 +156,10 @@ export default function HomeScreen() {
               <SpendingCard
                 amount={formatAmount(data.data.summary.totalExpenses)}
                 currency={group?.currency}
+                periodLabel={periodLabel}
+                dateRange={data.data.period?.startDate && data.data.period.endDate
+                  ? `${data.data.period.startDate} – ${data.data.period.endDate} · UTC`
+                  : undefined}
               />
 
               <BillSummaryCards

@@ -1387,3 +1387,40 @@ test("paying a reminder bill refreshes dashboard reminder counts and previews", 
     assert.deepEqual(result.data.data.billReminders.overdue, { count: 0, amount: 0, bills: [] });
   } finally { query.unsubscribe(); }
 });
+
+test("dashboard periods use separate group caches and expense changes refresh every group period", async () => {
+  signedIn();
+  const reads = new Map();
+  global.fetch = async (request) => {
+    const url = new URL(request.url);
+    if (request.method === "POST") {
+      assert.equal(url.pathname, "/api/groups/g1/expenses");
+      return respond(201, { success: true, data: { expense: { _id: "new" } } });
+    }
+    assert.match(url.pathname, /^\/api\/groups\/(g1|g2)\/dashboard$/);
+    const period = url.searchParams.get("period");
+    assert.ok(["all_time", "this_month", "last_month"].includes(period));
+    const key = `${url.pathname}:${period}`;
+    reads.set(key, (reads.get(key) ?? 0) + 1);
+    const total = { all_time: 100, this_month: 30, last_month: 70 }[period];
+    return respond(200, { success: true, data: { period: { value: period, timeZone: "UTC", startDate: null, endDate: null }, summary: { totalExpenses: total } } });
+  };
+  const args = [
+    { groupId: "g1", period: "all_time" },
+    { groupId: "g1", period: "this_month" },
+    { groupId: "g1", period: "last_month" },
+    { groupId: "g2", period: "this_month" },
+  ];
+  const queries = args.map(arg => store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate(arg)));
+  try {
+    const results = await Promise.all(queries.map(query => query.unwrap()));
+    assert.deepEqual(results.map(result => result.data.summary.totalExpenses), [100, 30, 70, 30]);
+    await store.dispatch(expensesApi.endpoints.createExpense.initiate({ groupId: "g1", body: { description: "Meal", amount: 10 } })).unwrap();
+    await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query => query.unwrap()));
+    for (const arg of args) {
+      const key = `/api/groups/${arg.groupId}/dashboard:${arg.period}`;
+      assert.equal(reads.get(key), arg.groupId === "g1" ? 2 : 1);
+      assert.equal(dashboardApi.endpoints.getGroupDashboard.select(arg)(store.getState()).data.data.period.value, arg.period);
+    }
+  } finally { queries.forEach(query => query.unsubscribe()); }
+});

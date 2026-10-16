@@ -28,6 +28,12 @@ Source: `src/modules/auth/auth.routes.js`, `auth.controller.js`, `auth.middlewar
 
 ## Feature API map
 
+### Dashboard spending periods (added 2026-10-16)
+
+- `GET /api/groups/:id/dashboard?period=this_month` accepts exactly `all_time`, `this_month`, or `last_month`; omission defaults to all_time. Invalid, blank, structured or repeated values return 400. Existing authentication/ACTIVE membership checks remain in place.
+- Only `data.summary` (totalExpenses, totalPaid, totalOwed) and `data.recentExpenses` use the selected expense `date` range. Recent previews remain the newest five by date/createdAt. UTC calendar months include their full final day; this_month covers the entire month, including future-dated expenses within it. Balances/settlement effects use all history; bill totals, upcoming bills and reminders stay current.
+- New `data.period` is `{ value, timeZone: "UTC", startDate, endDate }`; date labels are inclusive YYYY-MM-DD, or both null for all_time. Example this_month on 2026-10-16: startDate 2026-10-01, endDate 2026-10-31. No schema change or migration is required. Mobile provides This month, Last month and All time controls (default All time), with separate period/group query caches. Selection is scoped to its group; another group starts at All time. The spending card shows the period and inclusive UTC dates. Current balances and bill sections are explicitly distinguished from period spending. Pull-to-refresh/focus/resume/midnight refresh retain the selected period; bill/expense mutations invalidate every period for the group.
+
 Routes use `/api/groups`, not `/api/households`. Responses use `data.group` / `data.groups`; related records use `groupId`.
 
 Group routes cover CRUD and membership, plus `/:id/expenses`, `/:id/bills`, `/:id/balances`, `/:id/settlements`, and `/:id/dashboard`. Standalone expense and bill routes also mount under `/api/expenses` and `/api/bills`. Inspect the relevant module routes/controllers for exact methods and payloads.

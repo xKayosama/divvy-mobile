@@ -1,3 +1,6 @@
+export type DashboardPeriod = "all_time" | "this_month" | "last_month";
+export type DashboardRequest = { groupId: string; period?: DashboardPeriod };
+
 export type MemberBalance = {
   user: {
     _id: string;
@@ -43,6 +46,12 @@ export type DashboardSummaryResponse = {
   success: true;
   message: string;
   data: {
+    period?: {
+      value: DashboardPeriod;
+      timeZone: "UTC";
+      startDate: string | null;
+      endDate: string | null;
+    };
     summary: {
       totalExpenses: number;
       totalPaid: number;

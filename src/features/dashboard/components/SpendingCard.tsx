@@ -3,9 +3,9 @@ import { useTheme } from "@/theme/ThemeProvider";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, View } from "react-native";
 
-type Props = { amount: string; currency?: string };
+type Props = { amount: string; currency?: string; periodLabel?: string; dateRange?: string };
 
-export default function SpendingCard({ amount, currency }: Props) {
+export default function SpendingCard({ amount, currency, periodLabel = "All time", dateRange }: Props) {
   const { brandGradients } = useTheme();
   const gradient = `linear-gradient(125deg, ${brandGradients.spending.join(", ")})`;
 
@@ -91,7 +91,7 @@ export default function SpendingCard({ amount, currency }: Props) {
               letterSpacing: 0.8,
             }}
           >
-            ALL TIME
+            {periodLabel.toUpperCase()}
           </Text>
         </View>
       </View>
@@ -141,7 +141,7 @@ export default function SpendingCard({ amount, currency }: Props) {
           accessible={false}
         />
         <Text style={{ color: "#D3EDE2", fontSize: 12, flex: 1 }}>
-          Recorded expenses across your group
+          {dateRange ?? "Recorded expenses across your group"}
         </Text>
       </View>
     </View>
