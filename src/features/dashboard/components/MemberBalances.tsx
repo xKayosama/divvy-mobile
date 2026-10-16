@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { View } from "react-native";
 
 import { Text } from "@/components/ui/text";
@@ -7,19 +9,28 @@ import type { MemberBalance } from "../types";
 type Props = {
   balances: MemberBalance[];
   formatAmount: (amount: number) => string;
+  onSettleUp: () => void;
 };
 
 export default function MemberBalances({
   balances,
   formatAmount,
+  onSettleUp,
 }: Props) {
   const { colors, statusColors, surfaces } = useTheme();
   return (
     <View className="rounded-[24px] bg-card p-5" style={surfaces.card}>
-      <Text className="mb-3 text-lg font-semibold">
-        Who owes what
-      </Text>
+      <Text className="mb-3 text-lg font-semibold">Who owes what</Text>
 
+      <Button variant="outline" className="mb-3" onPress={onSettleUp}>
+        <Ionicons
+          name="swap-horizontal-outline"
+          size={18}
+          color={colors.primary}
+          accessible={false}
+        />
+        <Text>Settle up · View payments</Text>
+      </Button>
       {balances.length === 0 ? (
         <Text className="text-sm text-muted-foreground">
           No member balances yet.
@@ -34,7 +45,10 @@ export default function MemberBalances({
             ? statusColors.PAID
             : owing
               ? statusColors.PENDING
-              : { background: colors.muted, foreground: colors.mutedForeground };
+              : {
+                  background: colors.muted,
+                  foreground: colors.mutedForeground,
+                };
 
           const label = receiving
             ? `To receive: ${formatAmount(net)}`
@@ -66,6 +80,13 @@ export default function MemberBalances({
                     Paid {formatAmount(balance.paid)} · Share{" "}
                     {formatAmount(balance.owed)}
                   </Text>
+                  {(balance.settlementPaid ?? 0) > 0 ||
+                  (balance.settlementReceived ?? 0) > 0 ? (
+                    <Text className="text-xs text-muted-foreground">
+                      Repaid {formatAmount(balance.settlementPaid ?? 0)} ·
+                      Received {formatAmount(balance.settlementReceived ?? 0)}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
 
@@ -73,7 +94,10 @@ export default function MemberBalances({
                 className="self-start rounded-full px-3 py-2"
                 style={{ backgroundColor: palette.background }}
               >
-                <Text className="text-xs font-medium" style={{ color: palette.foreground }}>
+                <Text
+                  className="text-xs font-medium"
+                  style={{ color: palette.foreground }}
+                >
                   {label}
                 </Text>
               </View>

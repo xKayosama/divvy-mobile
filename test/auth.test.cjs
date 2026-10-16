@@ -905,3 +905,224 @@ for (const operation of ["renameGroup", "removeGroupMember"]) {
     }
   });
 }
+
+const {
+  settlementsApi,
+} = require("../src/features/settlements/settlementsApi.ts");
+const {
+  validatePayment,
+  localCalendarDate,
+} = require("../src/features/settlements/paymentForm.ts");
+
+test("repayment validation rejects invalid money and future/impossible dates", () => {
+  const now = new Date(2026, 9, 16, 12);
+  assert.equal(validatePayment("100.25", "2026-10-16", now), "");
+  assert.equal(validatePayment("0.01", "2024-02-29", now), "");
+  assert.equal(localCalendarDate(now), "2026-10-16");
+  for (const value of [
+    "0",
+    "-1",
+    "1.001",
+    "Infinity",
+    "1e3",
+    "",
+    "9007199254740992",
+  ])
+    assert.match(validatePayment(value, "2026-10-16", now), /positive amount/);
+  for (const value of [
+    "2026-10-17",
+    "2026-02-29",
+    "2026-04-31",
+    "16/10/2026",
+    "",
+  ])
+    assert.match(validatePayment("100", value, now), /valid payment date/);
+});
+
+test("record repayment sends only recipient, amount, date and refreshes balances, suggestions, history", async () => {
+  signedIn();
+  const reads = { suggestions: 0, history: 0, dashboard: 0 };
+  const body = { to: "u2", amount: 125.5, paidAt: "2026-10-15T16:00:00.000Z" };
+  global.fetch = async (request) => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    if (request.method === "POST") {
+      assert.equal(request.url, "https://divvy.test/api/groups/g1/settlements");
+      assert.deepEqual(await request.json(), body);
+      return respond(201, {
+        success: true,
+        data: { settlement: { _id: "s1", ...body, from: "u1" } },
+      });
+    }
+    if (request.url.includes("/history")) {
+      reads.history++;
+      return respond(200, {
+        success: true,
+        data: { settlements: [] },
+        pagination: { page: 1, totalPages: 0 },
+      });
+    }
+    if (request.url.endsWith("/dashboard")) {
+      reads.dashboard++;
+      return respond(200, { success: true, data: {} });
+    }
+    reads.suggestions++;
+    return respond(200, { success: true, data: { settlements: [] } });
+  };
+  const queries = [
+    store.dispatch(
+      settlementsApi.endpoints.getSettlementSuggestions.initiate("g1"),
+    ),
+    store.dispatch(
+      settlementsApi.endpoints.getSettlementHistory.initiate({ groupId: "g1" }),
+    ),
+    store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+  ];
+  try {
+    await Promise.all(queries.map((query) => query.unwrap()));
+    await store
+      .dispatch(
+        settlementsApi.endpoints.recordSettlement.initiate({
+          groupId: "g1",
+          body,
+        }),
+      )
+      .unwrap();
+    await Promise.all(
+      store
+        .dispatch(api.util.getRunningQueriesThunk())
+        .map((query) => query.unwrap()),
+    );
+    assert.deepEqual(reads, { suggestions: 2, history: 2, dashboard: 2 });
+  } finally {
+    queries.forEach((query) => query.unsubscribe());
+  }
+});
+
+test("repayment history uses backend pagination and separate page caches", async () => {
+  signedIn();
+  global.fetch = async (request) => {
+    const url = new URL(request.url);
+    assert.equal(url.pathname, "/api/groups/g1/settlements/history");
+    assert.equal(url.searchParams.get("limit"), "10");
+    const page = Number(url.searchParams.get("page"));
+    return respond(200, {
+      success: true,
+      data: { settlements: [{ _id: `p${page}` }] },
+      pagination: { page, totalPages: 2 },
+    });
+  };
+  for (const page of [1, 2])
+    await store
+      .dispatch(
+        settlementsApi.endpoints.getSettlementHistory.initiate(
+          { groupId: "g1", page },
+          { subscribe: false },
+        ),
+      )
+      .unwrap();
+  for (const page of [1, 2])
+    assert.equal(
+      settlementsApi.endpoints.getSettlementHistory.select({
+        groupId: "g1",
+        page,
+      })(store.getState()).data.data.settlements[0]._id,
+      `p${page}`,
+    );
+});
+
+for (const status of [400, 403, 500]) {
+  test(`repayment ${status} preserves saved history without optimistic balance changes`, async () => {
+    signedIn();
+    let reads = 0;
+    global.fetch = async (request) => {
+      if (request.method === "GET") {
+        reads++;
+        return respond(200, {
+          success: true,
+          data: { settlements: [] },
+          pagination: { page: 1, totalPages: 0 },
+        });
+      }
+      return respond(status, {
+        success: false,
+        message: "Payment could not be saved.",
+      });
+    };
+    const query = store.dispatch(
+      settlementsApi.endpoints.getSettlementHistory.initiate({ groupId: "g1" }),
+    );
+    try {
+      await query.unwrap();
+      await assert.rejects(
+        store
+          .dispatch(
+            settlementsApi.endpoints.recordSettlement.initiate({
+              groupId: "g1",
+              body: { to: "u2", amount: 10, paidAt: "2026-10-15T00:00:00Z" },
+            }),
+          )
+          .unwrap(),
+        (error) => error.status === status,
+      );
+      assert.equal(reads, 1);
+      assert.deepEqual(
+        settlementsApi.endpoints.getSettlementHistory.select({ groupId: "g1" })(
+          store.getState(),
+        ).data.data.settlements,
+        [],
+      );
+    } finally {
+      query.unsubscribe();
+    }
+  });
+}
+
+test("settled payment conflicts refresh history and suggestions", async () => {
+  signedIn();
+  let reads = 0;
+  global.fetch = async (request) => {
+    if (request.method === "GET") {
+      reads++;
+      return respond(200, { success: true, data: { settlements: [] } });
+    }
+    return respond(409, {
+      success: false,
+      message: "This repayment is already settled.",
+    });
+  };
+  const queries = [
+    store.dispatch(
+      settlementsApi.endpoints.getSettlementSuggestions.initiate("g1"),
+    ),
+    store.dispatch(
+      settlementsApi.endpoints.getSettlementHistory.initiate({ groupId: "g1" }),
+    ),
+  ];
+  try {
+    await Promise.all(queries.map((query) => query.unwrap()));
+    await assert.rejects(
+      store
+        .dispatch(
+          settlementsApi.endpoints.recordSettlement.initiate({
+            groupId: "g1",
+            body: {
+              requestId: "payment_request_2",
+              to: "u2",
+              amount: 10,
+              paidAt: "2026-10-15T00:00:00Z",
+            },
+          }),
+        )
+        .unwrap(),
+      (error) => error.status === 409,
+    );
+    await Promise.all(
+      store
+        .dispatch(api.util.getRunningQueriesThunk())
+        .map((query) => query.unwrap()),
+    );
+    assert.equal(reads, 4);
+  } finally {
+    queries.forEach((query) => query.unsubscribe());
+  }
+});

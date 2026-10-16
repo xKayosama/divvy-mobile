@@ -1,6 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { tabContentBottomInset } from "@/constants/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -21,9 +29,7 @@ export default function HomeScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { data: groupsData } = useGetMyGroupsQuery();
 
-  const group = groupsData?.data.groups.find(
-    (item) => item.id === groupId,
-  );
+  const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
   const { data, isLoading, isFetching, isError, refetch } =
     useGetGroupDashboardQuery(groupId, { skip: !groupId });
@@ -41,25 +47,27 @@ export default function HomeScreen() {
       className="flex-1 bg-background"
     >
       <ScreenBackground />
-      <ScrollView showsVerticalScrollIndicator={false}
-    scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
-    contentContainerStyle={{
-    padding: 20,
-    paddingBottom: tabContentBottomInset(insets.bottom),
-    flexGrow: 1,
-  }}
-  refreshControl={
-    groupId ? (
-      <RefreshControl
-        refreshing={isFetching && !isLoading}
-        onRefresh={() => {
-          if (!isFetching) void refetch();
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: tabContentBottomInset(insets.bottom),
+          flexGrow: 1,
         }}
-        tintColor={colors.primary}
-        colors={[colors.primary]}
-      />
-    ) : undefined
-  }>
+        refreshControl={
+          groupId ? (
+            <RefreshControl
+              refreshing={isFetching && !isLoading}
+              onRefresh={() => {
+                if (!isFetching) void refetch();
+              }}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          ) : undefined
+        }
+      >
         <View className="gap-6">
           <DashboardHeader
             groupName={group?.name ?? "Your group"}
@@ -78,10 +86,7 @@ export default function HomeScreen() {
             <View className="gap-3">
               <Text>Unable to load the dashboard.</Text>
 
-              <Button
-                disabled={isFetching}
-                onPress={() => void refetch()}
-              >
+              <Button disabled={isFetching} onPress={() => void refetch()}>
                 <Text>{isFetching ? "Retrying…" : "Retry"}</Text>
               </Button>
             </View>
@@ -105,6 +110,12 @@ export default function HomeScreen() {
               </Text>
 
               <MemberBalances
+                onSettleUp={() =>
+                  router.push({
+                    pathname: "/groups/[groupId]/settlements",
+                    params: { groupId },
+                  })
+                }
                 balances={data.data.balances}
                 formatAmount={formatAmount}
               />

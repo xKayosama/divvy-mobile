@@ -9,6 +9,8 @@ export type MemberBalance = {
   paid: number;
   owed: number;
   net: number;
+  settlementPaid?: number;
+  settlementReceived?: number;
 };
 
 export type UpcomingBill = {

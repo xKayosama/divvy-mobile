@@ -42,6 +42,19 @@ Mobile authentication now has typed responses, native secure token persistence (
 
 Keep credentials, tokens, and environment secrets out of this document.
 
+## Settlements and repayments (verified 2026-10-16)
+
+Source: backend commit `3469c76`, `src/modules/settlements/{Settlement.js,settlement.routes.js,settlement.controller.js,settlement.balances.js}`, balance and dashboard controllers.
+
+- `GET /api/groups/:id/settlements`: ACTIVE membership and bearer authentication; returns `{ success: true, data: { settlements: [{ from, to, amount }] } }`. From/to are populated users. These are current suggestions, not payment history; recorded repayments reduce the suggested amounts.
+- `POST /api/groups/:id/settlements`: body `{ to: userId, amount: number, paidAt: ISO timestamp, requestId?: string }`. Sender and recorder are always the authenticated user. Sending a different `from` is forbidden (403). Recipient must be a different ACTIVE member; amount must be positive, finite, safe in cents, and have at most two decimals. Payment date must be valid and not in the future. Invalid input returns 400. Success returns HTTP 201 with `data.settlement`; from/to/recordedBy are raw IDs in this response.
+- `GET /api/groups/:id/settlements/history?page=1&limit=10`: returns `data.settlements` populated at from/to/recordedBy plus `pagination: { page, limit, total, totalPages }`. Page must be a positive integer (maximum 1,000,000); limit 1–100. Order is paidAt, createdAt, _id descending. Mobile handles missing populated accounts.
+- Balances/dashboard retain purchase `paid`/`owed` totals and add `settlementPaid`, `settlementReceived`; net is `paid - owed + settlementPaid - settlementReceived`. Bills do not participate. Suggestions/balances use ACTIVE group membership.
+- Mobile provides a dashboard Settle up action, suggestions (prefill only the current sender's payments), paginated history, recipient/amount/date entry, explicit review, and success confirmation. Only payments sent by the current user can be recorded. Date selection is converted from local calendar midnight to ISO; today/past dates are allowed. Saving invalidates history and Dashboard tags, refreshing balances and suggestions. Expense/member mutations also refresh suggestions through the Dashboard tag.
+- Duplicate protection added on 2026-10-16: payments must match an outstanding suggested sender/recipient pair and cannot exceed its remaining amount. Settled/stale/excessive requests return 409. Suggestions are deterministically ordered by user ID. A unique per-pair balance-state claim prevents two concurrent requests from recording against the same snapshot; partial payments can be followed by the remaining amount after refresh.
+- Mobile creates a requestId when reviewing a payment and reuses it on retry. IDs are scoped to group/sender, must be 8–128 alphanumeric/underscore/hyphen characters, and are protected by a unique partial index. Identical retries return HTTP 200 with the original payment; changed details under the same ID return 409. The backend ensures unique indexes before writes and fails closed if they cannot be created.
+- The form offers only outstanding recipients, shows the remainder, guards duplicate taps, and fetches current suggestions immediately before saving. 409 refreshes history/suggestions/dashboard. No repayment edit/delete endpoint is present. Recording a payment does not transfer money.
+
 ## Group members (verified 2026-10-16)
 
 Source: `src/modules/groups/group.routes.js`, `group.controller.js`, and `groupAccess.middleware.js`.
