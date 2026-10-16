@@ -222,7 +222,7 @@ export default function HomeScreen() {
                   reminders={data.data.billReminders}
                   currency={group?.currency}
                   formatAmount={formatAmount}
-                  onOpenBill={(billId) => router.push({ pathname: "/groups/[groupId]/bills/[billId]/pay", params: { groupId, billId } })}
+                  onOpenBill={(billId) => router.push({ pathname: "/groups/[groupId]/bills/[billId]", params: { groupId, billId } })}
                   onViewBills={() => router.navigate({ pathname: "/groups/[groupId]/bills", params: { groupId } })}
                 />
               ) : null}

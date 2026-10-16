@@ -12,7 +12,7 @@ import { tabContentBottomInset } from "@/constants/navigation";
 import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
-import { useDeleteBillMutation, useGetGroupBillsQuery } from "../billsApi";
+import { useGetGroupBillsQuery } from "../billsApi";
 import { billCategories } from "../billForm";
 import BillFiltersModal, { type BillFilters } from "../components/BillFiltersModal";
 import type { BillStatus } from "../types";
@@ -22,8 +22,6 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
@@ -57,8 +55,8 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
     const timer = setTimeout(() => {
       setSearch(searchText.trim());
       setPage(1);
-      setConfirmId(null);
-      setDeleteError("");
+
+
     }, 350);
     return () => clearTimeout(timer);
   }, [searchText, searchPending]);
@@ -67,8 +65,8 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
     setSearchText("");
     setSearch("");
     setPage(1);
-    setConfirmId(null);
-    setDeleteError("");
+
+
   }
 
   const [filters, setFilters] = useState<BillFilters>(initialStatus ? { status: initialStatus } : {});
@@ -82,35 +80,9 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
   function applyFilters(next: BillFilters) {
     setFilters(next);
     setPage(1);
-    setConfirmId(null);
-    setDeleteError("");
+
+
     setShowFilters(false);
-  }
-
-  const [deleteBill, { isLoading: deleting }] = useDeleteBillMutation();
-  const deletingRef = useRef(false);
-
-  async function remove(billId: string) {
-    if (deletingRef.current) return;
-    if (
-      !currentData?.data.bills.some(
-        (bill) => bill._id === billId && bill.status !== "PAID",
-      )
-    )
-      return;
-    deletingRef.current = true;
-    setDeleteError("");
-    try {
-      await deleteBill({ groupId, billId }).unwrap();
-      setConfirmId(null);
-      setPage(1);
-    } catch (error) {
-      setDeleteError(
-        authError(error, "Could not delete this bill. Try again."),
-      );
-    } finally {
-      deletingRef.current = false;
-    }
   }
 
   const { data: groupsData } = useGetMyGroupsQuery();
@@ -176,7 +148,6 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
             className="h-12 w-12 rounded-2xl p-0"
             accessibilityLabel={hasFilters ? "Edit bill filters, filters active" : "Filter bills"}
             accessibilityState={{ selected: hasFilters }}
-            disabled={deleting}
             onPress={() => setShowFilters(true)}
           >
             <Ionicons
@@ -234,8 +205,8 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               onSubmitEditing={() => {
                 setSearch(searchText.trim());
                 setPage(1);
-                setConfirmId(null);
-                setDeleteError("");
+
+
               }}
             />
             {searchText ? (
@@ -329,7 +300,10 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
           ) : null
         }
         renderItem={({ item }) => (
-          <View
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`View bill details for ${item.name}`}
+            onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]", params: { groupId, billId: item._id } })}
             style={{
               ...surfaces.card,
               padding: 20,
@@ -362,6 +336,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               </Text>
 
               <BillStatusBadge status={item.status} />
+              <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} accessible={false} />
             </View>
 
             <Text
@@ -437,129 +412,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               </Text>
             ) : null}
 
-            {item.status !== "PAID" ? (
-              <Button
-                disabled={deleting}
-                variant="outline"
-                accessibilityLabel={`Mark ${item.name} as paid`}
-                onPress={() =>
-                  router.push({
-                    pathname: "/groups/[groupId]/bills/[billId]/pay",
-                    params: { groupId, billId: item._id },
-                  })
-                }
-              >
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={18}
-                  color={colors.foreground}
-                  accessible={false}
-                />
-                <Text>Mark as paid</Text>
-              </Button>
-            ) : null}
-            {item.status === "PAID" ? (
-              <View className="flex-row items-center gap-2">
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={14}
-                  color={colors.mutedForeground}
-                  accessible={false}
-                />
-                <Text className="text-xs text-muted-foreground">
-                  Paid bills cannot be edited or deleted.
-                </Text>
-              </View>
-            ) : confirmId === item._id ? (
-              <View className="gap-3 border-t border-border pt-3">
-                <Text accessibilityLiveRegion="polite">
-                  Delete “{item.name}” (
-                  {group?.currency ? `${group.currency} ` : ""}
-                  {formatAmount(item.amount)})? This cannot be undone.
-                </Text>
-                <Text className="text-sm text-muted-foreground">
-                  {item.isRecurring
-                    ? "This stops future generation from this bill. Bills already generated remain unchanged."
-                    : item.recurrenceSourceId
-                      ? "Only this occurrence will be removed. The recurring schedule continues."
-                      : "This removes the bill from your group."}
-                </Text>
-                {deleteError ? (
-                  <Text
-                    accessibilityLiveRegion="polite"
-                    className="text-destructive"
-                  >
-                    {deleteError}
-                  </Text>
-                ) : null}
-                <View className="flex-row flex-wrap gap-3">
-                  <Button
-                    variant="destructive"
-                    disabled={deleting}
-                    onPress={() => void remove(item._id)}
-                  >
-                    <Text>{deleting ? "Deleting…" : "Confirm delete"}</Text>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={deleting}
-                    onPress={() => {
-                      setConfirmId(null);
-                      setDeleteError("");
-                    }}
-                  >
-                    <Text>Cancel</Text>
-                  </Button>
-                </View>
-              </View>
-            ) : (
-              <View className="flex-row gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  disabled={deleting}
-                  accessibilityLabel={`Edit ${item.name}`}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/groups/[groupId]/bills/[billId]/edit",
-                      params: { groupId, billId: item._id },
-                    })
-                  }
-                >
-                  <Ionicons
-                    name="create-outline"
-                    size={18}
-                    color={colors.foreground}
-                    accessible={false}
-                  />
-                  <Text>Edit</Text>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  disabled={deleting}
-                  accessibilityLabel={`Delete ${item.name}`}
-                  onPress={() => {
-                    setConfirmId(item._id);
-                    setDeleteError("");
-                  }}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={18}
-                    color={colors.destructive}
-                    accessible={false}
-                  />
-                  <Text className="text-destructive">Delete</Text>
-                </Button>
-              </View>
-            )}
-            {item.notes ? (
-              <Text style={{ color: colors.mutedForeground }}>
-                {item.notes}
-              </Text>
-            ) : null}
-          </View>
+          </Pressable>
         )}
         ListFooterComponent={
           pagination && pagination.totalPages > 1 ? (
