@@ -1,3 +1,4 @@
+import { QueryErrorState, ContentState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -47,7 +48,7 @@ export default function HomeScreen() {
 
   const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
-  const { currentData: data, isLoading, isFetching, isError, refetch } =
+  const { currentData: data, isLoading, isFetching, isError, error, refetch } =
     useGetGroupDashboardQuery({ groupId, period }, { skip: !groupId, refetchOnMountOrArgChange: true });
 
   useFocusEffect(useCallback(() => {
@@ -138,20 +139,14 @@ export default function HomeScreen() {
           </View>
 
           {!groupId ? (
-            <Text>No group selected. Return to your groups.</Text>
+            <ContentState icon="people-outline" title="Choose a group" description="Open a group to see shared spending and upcoming bills." actionLabel="View groups" onAction={() => router.navigate("/groups")} />
           ) : isLoading || (!data && isFetching) ? (
             <View className="items-center gap-3 py-10">
               <ActivityIndicator />
               <Text>Loading {periodLabel.toLowerCase()} spending…</Text>
             </View>
           ) : isError ? (
-            <View className="gap-3">
-              <Text>Unable to load the dashboard.</Text>
-
-              <Button disabled={isFetching} onPress={() => void refetch()}>
-                <Text>{isFetching ? "Retrying…" : "Retry"}</Text>
-              </Button>
-            </View>
+            <QueryErrorState error={error} subject="Dashboard" busy={isFetching} onRetry={() => void refetch()} onBack={() => router.navigate("/groups")} />
           ) : data ? (
             <>
               <SpendingCard

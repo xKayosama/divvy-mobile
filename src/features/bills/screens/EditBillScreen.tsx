@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { authError } from "@/features/auth/errors";
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { useGetBillQuery } from "../billsApi";
 import CreateBillScreen from "./CreateBillScreen";
 
@@ -29,19 +29,8 @@ export default function EditBillScreen({
         {isFetching ? (
           <ActivityIndicator accessibilityLabel="Loading bill" />
         ) : (
-          <Text accessibilityLiveRegion="polite">
-            {isError
-              ? authError(error, "Unable to load this bill.")
-              : bill?.groupId !== groupId
-                ? "Bill not found in this group."
-                : "Paid bills cannot be edited or deleted."}
-          </Text>
+          isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} /> : <ContentState icon="lock-closed-outline" title={bill?.groupId === groupId ? "Paid bill locked" : "Bill unavailable"} description={bill?.groupId === groupId ? "Paid bills cannot be edited or deleted." : "This bill does not belong to the selected group."} />
         )}
-        {isError ? (
-          <Button disabled={isFetching} onPress={() => void refetch()}>
-            <Text>Retry</Text>
-          </Button>
-        ) : null}
         <Button
           variant="ghost"
           onPress={() =>

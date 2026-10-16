@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -5,7 +6,6 @@ import { ActivityIndicator, FlatList, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useAppSelector } from "@/hooks/redux";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -109,24 +109,11 @@ export default function SettlementsScreen({ groupId }: { groupId: string }) {
             </Text>
             <Text className="text-lg font-semibold">Suggested repayments</Text>
             {suggestions.isError ? (
-              <View className="gap-3">
-                <Text accessibilityLiveRegion="polite">
-                  {authError(suggestions.error, "Unable to load suggestions.")}
-                </Text>
-                <Button
-                  variant="outline"
-                  disabled={suggestions.isFetching}
-                  onPress={() => void suggestions.refetch()}
-                >
-                  <Text>Retry suggestions</Text>
-                </Button>
-              </View>
+              <QueryErrorState error={suggestions.error} subject="Repayment suggestions" busy={suggestions.isFetching} onRetry={() => void suggestions.refetch()} onBack={() => router.navigate("/groups")} />
             ) : suggestions.isLoading ? (
               <ActivityIndicator accessibilityLabel="Loading suggestions" />
             ) : suggestions.currentData?.data.settlements.length === 0 ? (
-              <Text className="text-muted-foreground">
-                No repayments suggested for current active members.
-              </Text>
+              <ContentState icon="checkmark-circle-outline" title="All settled up" description="There are no suggested repayments between current active members." />
             ) : (
               suggestions.currentData?.data.settlements.map((item) => (
                 <View
@@ -163,18 +150,7 @@ export default function SettlementsScreen({ groupId }: { groupId: string }) {
             )}
             <Text className="text-lg font-semibold">Payment history</Text>
             {history.isError ? (
-              <View className="gap-3">
-                <Text accessibilityLiveRegion="polite">
-                  {authError(history.error, "Unable to load payment history.")}
-                </Text>
-                <Button
-                  variant="outline"
-                  disabled={history.isFetching}
-                  onPress={() => void history.refetch()}
-                >
-                  <Text>Retry history</Text>
-                </Button>
-              </View>
+              <QueryErrorState error={history.error} subject="Payment history" busy={history.isFetching} onRetry={() => void history.refetch()} onBack={() => router.navigate("/groups")} />
             ) : null}
           </View>
         }
@@ -182,9 +158,7 @@ export default function SettlementsScreen({ groupId }: { groupId: string }) {
           history.isFetching ? (
             <ActivityIndicator accessibilityLabel="Loading payment history" />
           ) : !history.isError ? (
-            <Text className="text-muted-foreground">
-              No payments on this page.
-            </Text>
+            <ContentState icon="time-outline" title={page > 1 ? "No payments on this page" : "No payments recorded"} description={page > 1 ? "Return to the first page to see the latest recorded payments." : "Payments you record will appear here with the sender, recipient and date."} actionLabel={page > 1 ? "First page" : undefined} onAction={page > 1 ? () => setPage(1) : undefined} />
           ) : null
         }
         renderItem={({ item }) => (

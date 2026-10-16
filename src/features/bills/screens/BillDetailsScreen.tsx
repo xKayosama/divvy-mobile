@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -7,7 +8,7 @@ import ScreenBackground from "@/components/layout/ScreenBackground";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { authError, errorStatus } from "@/features/auth/errors";
+import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
 import { billCategories } from "../billForm";
@@ -63,11 +64,7 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
         </View>
         {!bill ? (
           isFetching ? <View className="items-center gap-3 py-12"><ActivityIndicator color={colors.primary} /><Text>Loading bill…</Text></View> : (
-            <View className="gap-4 rounded-[24px] bg-card p-5" style={surfaces.card}>
-              <Text accessibilityLiveRegion="polite">{isError ? errorStatus(error) === 404 ? "This bill was removed or could not be found." : authError(error, "Unable to load this bill.") : "This bill does not belong to this group."}</Text>
-              {isError ? <Button variant="outline" onPress={() => void refetch()}><Text>Retry</Text></Button> : null}
-              <Button onPress={back}><Text>Back to bills</Text></Button>
-            </View>
+            isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} onBack={back} backLabel="Back to bills" /> : <ContentState icon="lock-closed-outline" title="Bill unavailable" description="This bill does not belong to the selected group." actionLabel="Back to bills" onAction={back} />
           )
         ) : (
           <>

@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { ActivityIndicator, FlatList, View } from "react-native";
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { tabContentBottomInset } from "@/constants/navigation";
-import { authError } from "@/features/auth/errors";
 import { useAppSelector } from "@/hooks/redux";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useGetGroupMembersQuery, useGetMyGroupsQuery } from "../groupsApi";
@@ -131,21 +131,7 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
             </View>
             <Text className="text-lg font-semibold">Members</Text>
             {isError ? (
-              <View className="gap-3">
-                <Text
-                  accessibilityLiveRegion="polite"
-                  className="text-destructive"
-                >
-                  {authError(error, "Unable to load group members.")}
-                </Text>
-                <Button
-                  variant="outline"
-                  disabled={isFetching}
-                  onPress={() => void refetch()}
-                >
-                  <Text>Retry</Text>
-                </Button>
-              </View>
+              <QueryErrorState error={error} subject="Members" busy={isFetching} onRetry={() => void refetch()} onBack={() => router.navigate("/groups")} />
             ) : null}
           </View>
         }
@@ -156,9 +142,7 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
               accessibilityLabel="Loading members"
             />
           ) : !isError ? (
-            <Text className="text-muted-foreground">
-              No active members to display.
-            </Text>
+            <ContentState icon="people-outline" title="No active members" description="No members are available to display. Refresh to check for updates." actionLabel="Refresh members" onAction={() => void refetch()} busy={isFetching} />
           ) : null
         }
         renderItem={({ item }) => (

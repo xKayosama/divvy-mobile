@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { ListSortControl } from "@/components/ui/list-sort-control";
 import type { ExpenseSort } from "../types";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -11,7 +12,6 @@ import ScreenBackground from "@/components/layout/ScreenBackground";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { tabContentBottomInset } from "@/constants/navigation";
-import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useGetGroupExpensesQuery } from "../expensesApi";
@@ -98,7 +98,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
-  const currentData = searchPending ? undefined : queryData;
+  const currentData = searchPending || isError ? undefined : queryData;
   const hasCriteria = hasFilters || !!search;
 
   function formatAmount(amount: number) {
@@ -260,15 +260,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
         ) : null}
 
         {isError && !searchPending ? (
-          <View className="mt-3 gap-3">
-            <Text accessibilityLiveRegion="polite">
-              {authError(error, "Unable to load expenses. Try again.")}
-            </Text>
-
-            <Button disabled={isFetching} onPress={() => void refetch()}>
-              <Text>{isFetching ? "Retrying…" : "Retry"}</Text>
-            </Button>
-          </View>
+          <QueryErrorState error={error} subject="Expenses" busy={isFetching} onRetry={() => void refetch()} onBack={() => router.navigate("/groups")} />
         ) : null}
       </View>
 
@@ -286,34 +278,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
               <Text>{searchPending || search ? "Searching expenses…" : "Loading expenses…"}</Text>
             </View>
           ) : !isError ? (
-            <View className="items-center gap-3 rounded-[24px] bg-card px-6 py-10">
-              <View className="h-16 w-16 items-center justify-center rounded-full bg-secondary">
-                <Ionicons
-                  name="receipt-outline"
-                  size={28}
-                  color={colors.primary}
-                  accessible={false}
-                />
-              </View>
-
-              <Text className="text-lg font-semibold">
-                {hasCriteria ? "No expenses found" : "No expenses yet"}
-              </Text>
-
-              <Text className="text-center text-sm text-muted-foreground">
-                {hasCriteria
-                  ? "Try another description, category or date range."
-                  : `No expenses have been recorded for ${group?.name ?? "this group"}. Tap Add expense to record one.`}
-              </Text>
-              {hasCriteria ? (
-                <Button variant="outline" onPress={() => {
-                  clearSearch();
-                  applyFilters({});
-                }}>
-                  <Text>Clear search and filters</Text>
-                </Button>
-              ) : null}
-            </View>
+            <ContentState icon="receipt-outline" title={hasCriteria ? "No expenses found" : "No expenses yet"} description={hasCriteria ? "Try a different search or clear your filters to see more results." : "Record a shared purchase to track who paid and how it’s split."} actionLabel={hasCriteria ? "Clear search and filters" : "Add expense"} onAction={() => { if (hasCriteria) { clearSearch(); applyFilters({}); } else router.push({ pathname: "/groups/[groupId]/expenses/create", params: { groupId } }); }} />
           ) : null}
         </View>
       ) : (

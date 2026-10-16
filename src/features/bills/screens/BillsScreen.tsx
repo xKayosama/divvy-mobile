@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { ListSortControl } from "@/components/ui/list-sort-control";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ScreenBackground from "@/components/layout/ScreenBackground";
 import { tabContentBottomInset } from "@/constants/navigation";
-import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useGetGroupBillsQuery } from "../billsApi";
@@ -96,7 +96,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
-  const currentData = searchPending ? undefined : queryData;
+  const currentData = searchPending || isError ? undefined : queryData;
   const hasCriteria = hasFilters || !!search;
   const bills = currentData?.data.bills ?? [];
   const pagination = currentData?.pagination;
@@ -241,25 +241,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
         ) : null}
 
         {isError && !searchPending ? (
-          <View style={{ gap: 8 }}>
-            <Text
-              accessibilityLiveRegion="polite"
-              style={{ color: colors.destructive }}
-            >
-              {authError(error, "Unable to load bills.")}
-            </Text>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={isFetching}
-              onPress={refresh}
-              style={{ paddingVertical: 12, minHeight: 48 }}
-            >
-              <Text style={{ color: colors.primary }}>
-                {isFetching ? "Retrying…" : "Retry"}
-              </Text>
-            </Pressable>
-          </View>
+          <QueryErrorState error={error} subject="Bills" busy={isFetching} onRetry={() => void refetch()} onBack={() => router.navigate("/groups")} />
         ) : null}
       </View>
 
@@ -285,21 +267,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               <Text style={{ color: colors.foreground }}>{searchPending || search ? "Searching bills…" : "Loading bills…"}</Text>
             </View>
           ) : !isError ? (
-            <View style={{ alignItems: "center", gap: 8, padding: 32 }}>
-              <Text
-                style={{
-                  color: colors.foreground,
-                  fontSize: 18,
-                  fontWeight: "600",
-                }}
-              >
-                {hasCriteria ? "No bills found" : "No bills yet"}
-              </Text>
-              <Text style={{ color: colors.mutedForeground }}>
-                {hasCriteria ? "Try another name, note or filter." : "Tap Add bill to record a bill and its due date."}
-              </Text>
-              {hasCriteria ? <Button variant="outline" onPress={() => { clearSearch(); applyFilters({}); }}><Text>Clear search and filters</Text></Button> : null}
-            </View>
+            <ContentState icon="calendar-outline" title={hasCriteria ? "No bills found" : "No bills yet"} description={hasCriteria ? "Try a different search or clear your filters to see more results." : "Add a bill to keep track of due dates and payments."} actionLabel={hasCriteria ? "Clear search and filters" : "Add bill"} onAction={() => { if (hasCriteria) { clearSearch(); applyFilters({}); } else router.push({ pathname: "/groups/[groupId]/bills/create", params: { groupId } }); }} />
           ) : null
         }
         renderItem={({ item }) => (

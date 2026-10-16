@@ -1,3 +1,4 @@
+import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
@@ -13,13 +14,13 @@ import { useGetMyGroupsQuery } from "../groupsApi";
 export default function GroupListScreen() {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
-  const { data, isLoading, isFetching, isError, refetch } = useGetMyGroupsQuery();
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetMyGroupsQuery();
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-background">
       <ScreenBackground />
       <FlatList
-        data={data?.data.groups ?? []}
+        data={isError ? [] : data?.data.groups ?? []}
         keyExtractor={(group) => group.id}
         showsVerticalScrollIndicator={false}
         refreshing={isFetching && !isLoading}
@@ -43,10 +44,7 @@ export default function GroupListScreen() {
               <Text className="font-semibold">Create group</Text>
             </Button>
             {isError ? (
-              <View className="gap-3">
-                <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">Unable to load your groups.</Text>
-                <Button variant="outline" className="rounded-xl" disabled={isFetching} onPress={() => void refetch()}><Text>Retry</Text></Button>
-              </View>
+              <QueryErrorState error={error} subject="Groups" busy={isFetching} onRetry={() => void refetch()} />
             ) : data ? <Text className="text-xs text-muted-foreground">{data.data.groups.length} {data.data.groups.length === 1 ? "group" : "groups"}</Text> : null}
           </View>
         }
@@ -54,11 +52,7 @@ export default function GroupListScreen() {
           isLoading ? (
             <View className="items-center gap-3 py-10"><ActivityIndicator color={colors.primary} /><Text>Loading your groups…</Text></View>
           ) : !isError ? (
-            <View className="items-center gap-3 px-6 py-10" style={surfaces.card}>
-              <Ionicons name="people-outline" size={32} color={colors.primary} accessible={false} />
-              <Text className="text-lg font-semibold">A space for shared spending</Text>
-              <Text className="text-center text-sm text-muted-foreground">Create your first group for your household, friends, or next trip.</Text>
-            </View>
+            <ContentState icon="people-outline" title="A space for shared spending" description="Create your first group for your household, friends, or next trip." actionLabel="Create group" onAction={() => router.push("/groups/create")} />
           ) : null
         }
         ItemSeparatorComponent={() => <View className="h-3" />}
