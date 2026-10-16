@@ -141,14 +141,45 @@ For auth or layout changes, manually check registration, duplicate email errors,
 
 Native directories are generated and ignored. Configure native behavior through app.json and config plugins; do not hand-create or edit ios/android.
 
-No eas.json is present yet. Configure EAS build profiles, app identifiers, signing, and environments before using a release workflow. Follow the [EAS Build guide](https://docs.expo.dev/build/introduction/) and invoke the CLI using `npx eas-cli@latest <command>`.
+Development builds are configured in `eas.json` and use the SDK-compatible
+`expo-dev-client`. The app is linked to [@kayosama/divvy-mobile](https://expo.dev/accounts/kayosama/projects/divvy-mobile).
 
-After a development profile exists, cloud development builds can use:
+- `development`: internal distribution for a physical iPhone or Android device,
+  using the EAS `development` environment.
+- `development-simulator`: extends development with `ios.simulator: true` for an
+  iOS Simulator build. It cannot be installed on a physical iPhone.
+- iOS identifier: `com.kayosama.divvy-mobile`; Android package:
+  `com.kayosama.divvy_mobile`.
+
+Validate profiles without starting a build:
 
 ```bash
+npx eas-cli@latest config --profile development --platform ios
+npx eas-cli@latest config --profile development --platform android
+```
+
+A physical-iPhone build requires Apple Developer signing and a registered device.
+Configure those interactively when preparing the first device build; they have
+not been verified by local profile validation. Sign in with
+`npx eas-cli@latest login` if the CLI has no active Expo session.
+
+Cloud development build commands (run only when ready to start a build):
+
+```bash
+npx eas-cli@latest device:create
 npx eas-cli@latest build --profile development --platform ios
 npx eas-cli@latest build --profile development --platform android
+npx eas-cli@latest build --profile development-simulator --platform ios
 ```
+
+After installing the build, run `npm run start:dev` and open the development
+server in the app. `EXPO_PUBLIC_API_URL` comes from the local Expo environment
+when Metro serves JavaScript. The current `.env` uses a private LAN backend;
+keep the backend running and the phone on a network that can reach it. EAS
+`development` environment values should use a reachable API URL when cloud
+bundling is required. Public Expo variables are embedded in the client, so they
+must never contain credentials. No API URL is hardcoded in the build profiles.
+A Metro tunnel does not expose the separate backend automatically.
 
 Expo Go includes only its bundled native modules. Native dependencies outside that bundle require a development build. Submission and OTA updates need their own EAS setup; this repository does not yet establish a submission or update pipeline.
 

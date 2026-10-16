@@ -18,7 +18,8 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/divvy-icon-green.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kayosama.divvy_mobile"
     },
     "web": {
       "output": "static",
@@ -52,6 +53,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "55cb431e-ce69-4629-b408-a67c05851ede"
+      }
+    },
+    "owner": "kayosama"
   }
 }
