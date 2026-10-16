@@ -40,3 +40,20 @@ export function validateExpenseFilters(filters: ExpenseFilters): string {
     return "End date must be on or after start date.";
   return "";
 }
+
+
+export function expenseFiltersFromParams(params: {
+  category?: string | string[];
+  startDate?: string | string[];
+  endDate?: string | string[];
+}): ExpenseFilters {
+  if (Object.values(params).some(value => Array.isArray(value))) return {};
+  const { category, startDate, endDate } = params;
+  if (category && !expenseCategories.includes(category as ExpenseCategory)) return {};
+  const filters: ExpenseFilters = {
+    category: (category || undefined) as ExpenseCategory | undefined,
+    startDate: (startDate || undefined) as string | undefined,
+    endDate: (endDate || undefined) as string | undefined,
+  };
+  return validateExpenseFilters(filters) ? {} : filters;
+}

@@ -167,6 +167,15 @@ export default function HomeScreen() {
                 <CategoryBreakdown
                   key={`${groupId}:${period}`}
                   categories={data.data.spendingByCategory}
+                  onOpenCategory={(category) => router.navigate({
+                    pathname: "/groups/[groupId]/expenses",
+                    params: {
+                      groupId, category,
+                      startDate: data.data.period?.startDate ?? "",
+                      endDate: data.data.period?.endDate ?? "",
+                      filterRequest: String(Date.now()),
+                    },
+                  })}
                   periodLabel={periodLabel}
                   currency={group?.currency}
                   formatAmount={formatAmount}

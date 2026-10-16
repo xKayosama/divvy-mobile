@@ -1425,3 +1425,20 @@ test("dashboard periods use separate group caches and expense changes refresh ev
     }
   } finally { queries.forEach(query => query.unsubscribe()); }
 });
+
+test("category shortcuts validate and preserve dashboard period bounds, including all time", () => {
+  const { expenseFiltersFromParams } = require("../src/features/expenses/filters.ts");
+  assert.deepEqual(expenseFiltersFromParams({ category: "GROCERIES", startDate: "2026-10-01", endDate: "2026-10-31" }), {
+    category: "GROCERIES", startDate: "2026-10-01", endDate: "2026-10-31",
+  });
+  assert.deepEqual(expenseFiltersFromParams({ category: "RENT", startDate: "", endDate: "" }), {
+    category: "RENT", startDate: undefined, endDate: undefined,
+  });
+  for (const params of [
+    { category: "UNKNOWN" },
+    { category: ["FOOD", "RENT"] },
+    { category: "FOOD", startDate: ["2026-10-01"] },
+    { category: "FOOD", startDate: "2026-02-30" },
+    { category: "FOOD", startDate: "2026-10-31", endDate: "2026-10-01" },
+  ]) assert.deepEqual(expenseFiltersFromParams(params), {});
+});

@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { categoryIcons } from "@/features/expenses/categoryIcons";
@@ -12,9 +12,10 @@ type Props = {
   periodLabel: string;
   currency?: string;
   formatAmount: (amount: number) => string;
+  onOpenCategory: (category: SpendingCategory["category"]) => void;
 };
 
-export default function CategoryBreakdown({ categories, periodLabel, currency, formatAmount }: Props) {
+export default function CategoryBreakdown({ categories, periodLabel, currency, formatAmount, onOpenCategory }: Props) {
   const { colors, surfaces } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? categories : categories.slice(0, 3);
@@ -40,7 +41,13 @@ export default function CategoryBreakdown({ categories, periodLabel, currency, f
             const label = item.category.charAt(0) + item.category.slice(1).toLowerCase();
             const percentage = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2 }).format(item.percentage);
             return (
-              <View key={item.category} className="gap-2">
+              <Pressable
+                key={item.category}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${label.toLowerCase()} expenses, ${periodLabel.toLowerCase()}`}
+                onPress={() => onOpenCategory(item.category)}
+                className="min-h-12 gap-2 rounded-xl active:opacity-60"
+              >
                 <View className="flex-row items-center gap-3">
                   <View className="h-9 w-9 items-center justify-center rounded-xl bg-secondary">
                     <Ionicons name={categoryIcons[item.category] ?? categoryIcons.OTHERS} size={18} color={colors.primary} accessible={false} />
@@ -49,6 +56,7 @@ export default function CategoryBreakdown({ categories, periodLabel, currency, f
                     <Text className="text-sm font-semibold">{label}</Text>
                     <Text className="text-xs text-muted-foreground">{item.count} {item.count === 1 ? "expense" : "expenses"} · {percentage}%</Text>
                   </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} accessible={false} />
                 </View>
                 <View className="ml-12 gap-2">
                   <Text className="text-sm font-semibold" style={{ fontVariant: ["tabular-nums"] }}>{currency ? `${currency} ` : ""}{formatAmount(item.amount)}</Text>
@@ -61,7 +69,7 @@ export default function CategoryBreakdown({ categories, periodLabel, currency, f
                     <View style={{ height: "100%", width: `${Math.max(0, Math.min(100, item.percentage))}%`, backgroundColor: colors.primary, borderRadius: 3 }} />
                   </View>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>

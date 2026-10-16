@@ -27,7 +27,7 @@ const splitLabels = {
   PERCENTAGE: "Percentage split",
 };
 
-export default function ExpensesScreen({ groupId }: { groupId: string }) {
+export default function ExpensesScreen({ groupId, initialFilters = {} }: { groupId: string; initialFilters?: ExpenseFilters }) {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
@@ -81,7 +81,7 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
     setDeleteError("");
   }
 
-  const [filters, setFilters] = useState<ExpenseFilters>({});
+  const [filters, setFilters] = useState<ExpenseFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const hasFilters = !!(
     filters.category ||
