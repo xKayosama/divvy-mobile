@@ -24,6 +24,7 @@ import BillReminders from "../components/BillReminders";
 import BillSummaryCards from "../components/BillSummaryCards";
 import DashboardHeader from "../components/DashboardHeader";
 import MemberBalances from "../components/MemberBalances";
+import CategoryBreakdown from "../components/CategoryBreakdown";
 import SpendingCard from "../components/SpendingCard";
 import UpcomingBills from "../components/UpcomingBills";
 import type { DashboardPeriod } from "../types";
@@ -161,6 +162,16 @@ export default function HomeScreen() {
                   ? `${data.data.period.startDate} – ${data.data.period.endDate} · UTC`
                   : undefined}
               />
+
+              {data.data.spendingByCategory ? (
+                <CategoryBreakdown
+                  key={`${groupId}:${period}`}
+                  categories={data.data.spendingByCategory}
+                  periodLabel={periodLabel}
+                  currency={group?.currency}
+                  formatAmount={formatAmount}
+                />
+              ) : null}
 
               <BillSummaryCards
                 pendingAmount={formatAmount(data.data.bills.pendingAmount)}

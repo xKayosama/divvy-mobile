@@ -1,3 +1,5 @@
+import type { ExpenseCategory } from "@/features/expenses/types";
+
 export type DashboardPeriod = "all_time" | "this_month" | "last_month";
 export type DashboardRequest = { groupId: string; period?: DashboardPeriod };
 
@@ -41,6 +43,13 @@ export type BillReminders = {
   dueSoon: BillReminderGroup;
 };
 
+export type SpendingCategory = {
+  category: ExpenseCategory;
+  amount: number;
+  count: number;
+  percentage: number;
+};
+
 export type DashboardSummaryResponse = {
   code: number;
   success: true;
@@ -52,6 +61,7 @@ export type DashboardSummaryResponse = {
       startDate: string | null;
       endDate: string | null;
     };
+    spendingByCategory?: SpendingCategory[];
     summary: {
       totalExpenses: number;
       totalPaid: number;

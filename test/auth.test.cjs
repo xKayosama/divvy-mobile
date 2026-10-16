@@ -1403,7 +1403,7 @@ test("dashboard periods use separate group caches and expense changes refresh ev
     const key = `${url.pathname}:${period}`;
     reads.set(key, (reads.get(key) ?? 0) + 1);
     const total = { all_time: 100, this_month: 30, last_month: 70 }[period];
-    return respond(200, { success: true, data: { period: { value: period, timeZone: "UTC", startDate: null, endDate: null }, summary: { totalExpenses: total } } });
+    return respond(200, { success: true, data: { period: { value: period, timeZone: "UTC", startDate: null, endDate: null }, summary: { totalExpenses: total }, spendingByCategory: [{ category: "FOOD", amount: total, count: 1, percentage: 100 }] } });
   };
   const args = [
     { groupId: "g1", period: "all_time" },
@@ -1415,6 +1415,7 @@ test("dashboard periods use separate group caches and expense changes refresh ev
   try {
     const results = await Promise.all(queries.map(query => query.unwrap()));
     assert.deepEqual(results.map(result => result.data.summary.totalExpenses), [100, 30, 70, 30]);
+    assert.deepEqual(results.map(result => result.data.spendingByCategory[0].amount), [100, 30, 70, 30]);
     await store.dispatch(expensesApi.endpoints.createExpense.initiate({ groupId: "g1", body: { description: "Meal", amount: 10 } })).unwrap();
     await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query => query.unwrap()));
     for (const arg of args) {
