@@ -1,9 +1,10 @@
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ScreenBackground from "@/components/layout/ScreenBackground";
@@ -13,6 +14,7 @@ import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
 import { useDeleteBillMutation, useGetGroupBillsQuery } from "../billsApi";
 import { billCategories } from "../billForm";
+import BillFiltersModal, { type BillFilters } from "../components/BillFiltersModal";
 import BillStatusBadge from "../components/BillStatusBadge";
 
 export default function BillsScreen({ groupId }: { groupId: string }) {
@@ -21,6 +23,69 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
   const [page, setPage] = useState(1);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState("");
+  const searchPending = searchText.trim() !== search;
+  const searchInput = useRef<TextInput>(null);
+  const searchProgress = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
+  const searchStyle = useAnimatedStyle(() => ({
+    height: searchProgress.get() * 50,
+    opacity: searchProgress.get(),
+    marginTop: -8 * (1 - searchProgress.get()),
+    overflow: "hidden",
+  }));
+
+  useEffect(() => {
+    searchProgress.set(withTiming(showSearch ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      reduceMotion: ReduceMotion.System,
+    }));
+    if (!showSearch) {
+      searchInput.current?.blur();
+      return;
+    }
+    const timer = setTimeout(() => searchInput.current?.focus(), reducedMotion ? 0 : 220);
+    return () => clearTimeout(timer);
+  }, [showSearch, searchProgress, reducedMotion]);
+
+  useEffect(() => {
+    if (!searchPending) return;
+    const timer = setTimeout(() => {
+      setSearch(searchText.trim());
+      setPage(1);
+      setConfirmId(null);
+      setDeleteError("");
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchText, searchPending]);
+
+  function clearSearch() {
+    setSearchText("");
+    setSearch("");
+    setPage(1);
+    setConfirmId(null);
+    setDeleteError("");
+  }
+
+  const [filters, setFilters] = useState<BillFilters>({});
+  const [showFilters, setShowFilters] = useState(false);
+  const hasFilters = !!(
+    filters.category ||
+    filters.status ||
+    filters.isRecurring !== undefined
+  );
+
+  function applyFilters(next: BillFilters) {
+    setFilters(next);
+    setPage(1);
+    setConfirmId(null);
+    setDeleteError("");
+    setShowFilters(false);
+  }
+
   const [deleteBill, { isLoading: deleting }] = useDeleteBillMutation();
   const deletingRef = useRef(false);
 
@@ -50,12 +115,14 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
   const { data: groupsData } = useGetMyGroupsQuery();
   const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
-  const { currentData, isFetching, isError, error, refetch } =
+  const { currentData: queryData, isFetching, isError, error, refetch } =
     useGetGroupBillsQuery(
-      { groupId, page, limit: 10 },
-      { refetchOnMountOrArgChange: true },
+      { groupId, page, limit: 10, ...filters, search: search || undefined },
+      { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
+  const currentData = searchPending ? undefined : queryData;
+  const hasCriteria = hasFilters || !!search;
   const bills = currentData?.data.bills ?? [];
   const pagination = currentData?.pagination;
 
@@ -84,16 +151,41 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
     >
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
-        <Text
-          style={{
-            fontSize: 30,
-            lineHeight: 38,
-            fontWeight: "700",
-            color: colors.foreground,
-          }}
-        >
-          Bills
-        </Text>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">Bills</Text>
+          <Button
+            variant={showSearch ? "default" : "outline"}
+            className="h-12 w-12 rounded-2xl p-0"
+            accessibilityLabel={showSearch ? "Close bill search" : "Search bills"}
+            accessibilityState={{ expanded: showSearch }}
+            onPress={() => {
+              if (showSearch) clearSearch();
+              setShowSearch((value) => !value);
+            }}
+          >
+            <Ionicons
+              name={showSearch ? "close-outline" : "search-outline"}
+              size={21}
+              color={showSearch ? colors.primaryForeground : colors.foreground}
+              accessible={false}
+            />
+          </Button>
+          <Button
+            variant={hasFilters ? "default" : "outline"}
+            className="h-12 w-12 rounded-2xl p-0"
+            accessibilityLabel={hasFilters ? "Edit bill filters, filters active" : "Filter bills"}
+            accessibilityState={{ selected: hasFilters }}
+            disabled={deleting}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons
+              name="options-outline"
+              size={21}
+              color={hasFilters ? colors.primaryForeground : colors.foreground}
+              accessible={false}
+            />
+          </Button>
+        </View>
 
         <Text style={{ color: colors.mutedForeground }}>
           {group?.name ?? "Your group"}
@@ -117,14 +209,63 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
           />
           <Text>Add bill</Text>
         </Button>
+        <Animated.View
+          style={searchStyle}
+          pointerEvents={showSearch ? "auto" : "none"}
+          accessibilityElementsHidden={!showSearch}
+          importantForAccessibility={showSearch ? "auto" : "no-hide-descendants"}
+        >
+          <View className="min-h-12 flex-1 flex-row items-center rounded-2xl border border-border bg-card pl-3">
+            <Ionicons name="search-outline" size={20} color={colors.mutedForeground} accessible={false} />
+            <TextInput
+              ref={searchInput}
+              className="min-w-0 flex-1 px-3 py-3 text-base text-foreground"
+              style={{ minHeight: 48 }}
+              placeholder="Search bills"
+              placeholderTextColor={colors.mutedForeground}
+              accessibilityLabel="Search bills by name or notes"
+              value={searchText}
+              onChangeText={setSearchText}
+              maxLength={200}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                setSearch(searchText.trim());
+                setPage(1);
+                setConfirmId(null);
+                setDeleteError("");
+              }}
+            />
+            {searchText ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear bill search"
+                className="h-12 w-12 items-center justify-center"
+                onPress={() => {
+                  clearSearch();
+                  searchInput.current?.focus();
+                }}
+              >
+                <Ionicons name="close-circle" size={21} color={colors.mutedForeground} accessible={false} />
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
+        {hasFilters ? (
+          <Text className="text-xs text-muted-foreground">{[
+            filters.category?.toLowerCase(), filters.status?.toLowerCase(),
+            filters.isRecurring === undefined ? undefined : filters.isRecurring ? "Recurring" : "One-time",
+          ].filter(Boolean).join(" · ")}</Text>
+        ) : null}
         {pagination ? (
           <Text style={{ color: colors.mutedForeground }}>
             {pagination.total} {pagination.total === 1 ? "bill" : "bills"}{" "}
-            recorded
+            {hasCriteria ? "matching" : "recorded"}
           </Text>
         ) : null}
 
-        {isError ? (
+        {isError && !searchPending ? (
           <View style={{ gap: 8 }}>
             <Text
               accessibilityLiveRegion="polite"
@@ -148,6 +289,8 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
       </View>
 
       <FlatList
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         scrollIndicatorInsets={{ bottom: tabContentBottomInset(insets.bottom) }}
         style={{ flex: 1 }}
         data={bills}
@@ -161,10 +304,10 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
         }}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         ListEmptyComponent={
-          isFetching ? (
+          isFetching || searchPending ? (
             <View style={{ alignItems: "center", gap: 12, padding: 32 }}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={{ color: colors.foreground }}>Loading bills…</Text>
+              <Text style={{ color: colors.foreground }}>{searchPending || search ? "Searching bills…" : "Loading bills…"}</Text>
             </View>
           ) : !isError ? (
             <View style={{ alignItems: "center", gap: 8, padding: 32 }}>
@@ -175,11 +318,12 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
                   fontWeight: "600",
                 }}
               >
-                No bills yet
+                {hasCriteria ? "No bills found" : "No bills yet"}
               </Text>
               <Text style={{ color: colors.mutedForeground }}>
-                Tap Add bill to record a bill and its due date.
+                {hasCriteria ? "Try another name, note or filter." : "Tap Add bill to record a bill and its due date."}
               </Text>
+              {hasCriteria ? <Button variant="outline" onPress={() => { clearSearch(); applyFilters({}); }}><Text>Clear search and filters</Text></Button> : null}
             </View>
           ) : null
         }
@@ -445,6 +589,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
           ) : null
         }
       />
+      {showFilters ? <BillFiltersModal filters={filters} onApply={applyFilters} onClose={() => setShowFilters(false)} /> : null}
     </View>
   );
 }

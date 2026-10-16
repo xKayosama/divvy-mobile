@@ -78,6 +78,11 @@ Source: `src/modules/groups/group.routes.js`, `group.controller.js`, and `groupA
 - `PUT /api/groups/:id`: ACTIVE group membership plus `group.ownerId === current user` required. Renaming sends only `{ name }`, trimmed and nonempty. HTTP 200 returns `data.group`; blank names return 400, nonowners 403. Mobile settings prefill the current name and refresh group caches after saving. Currency is shown read-only.
 - Removal/renaming reverified against current routes/controllers on 2026-10-16. Direct mobile management routes check owner membership as well as hiding controls from regular members; backend authorization remains authoritative. Forms preserve input after errors and guard against duplicate submissions.
 
+## Bill search and filters (verified 2026-10-16)
+
+- `GET /api/groups/:id/bills` supports `search`, `category`, `status`, `isRecurring`, `page`, and `limit` (1–100). Verified against the current bills controller. Search matches literal, case-insensitive substrings in name or notes, trims whitespace, and allows up to 200 characters. Category/status are uppercased. `isRecurring` must be the string `true` or `false`; omission includes both. Results sort by dueDate ascending and createdAt descending; counts use the same combined filters.
+- Mobile provides animated expandable search with a 350 ms debounce and a category/status/repeat dialog. Applying search/filters resets pagination; refresh and paging retain them. One-time bills explicitly send `isRecurring=false`. Clear search preserves filters; the empty-state action clears both. Bill mutation invalidation refreshes filtered lists.
+
 ## Bill creation and payment (verified 2026-10-15)
 
 Source: `src/modules/bills/bill.routes.js`, `bill.controller.js`, `Bill.js`, group access middleware, and `src/app.js` mounts.

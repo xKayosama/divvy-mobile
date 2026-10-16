@@ -60,6 +60,9 @@ export type GetBillsRequest = {
   page?: number;
   limit?: number;
   status?: BillStatus;
+  category?: BillCategory;
+  search?: string;
+  isRecurring?: boolean;
 };
 
 export type BillsResponse = {

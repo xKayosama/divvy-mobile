@@ -11,6 +11,8 @@ export const billsApi = api
     addTagTypes: ["Bills", "Dashboard"],
   })
   .injectEndpoints({
+    // Replace stale query definitions when Metro reevaluates this module.
+    overrideExisting: typeof __DEV__ !== "undefined" && __DEV__,
     endpoints: (builder) => ({
       updateBill: builder.mutation<
         BillResponse,
@@ -89,12 +91,15 @@ export const billsApi = api
               ],
       }),
       getGroupBills: builder.query<BillsResponse, GetBillsRequest>({
-        query: ({ groupId, page = 1, limit = 10, status }) => ({
+        query: ({ groupId, page = 1, limit = 10, status, category, search, isRecurring }) => ({
           url: `/groups/${encodeURIComponent(groupId)}/bills`,
           params: {
             page,
             limit,
             ...(status ? { status } : {}),
+            category,
+            search,
+            isRecurring,
           },
         }),
         providesTags: (_result, _error, { groupId }) => [

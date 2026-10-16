@@ -1310,3 +1310,48 @@ test("receipt errors distinguish upload failure from OCR timeout", () => {
     "Not a receipt",
   );
 });
+
+test("bill search and filters combine, preserve false and use distinct page/search caches", async () => {
+  signedIn();
+  const requests = [];
+  global.fetch = async (request) => {
+    const url = new URL(request.url);
+    assert.equal(url.pathname, "/api/groups/g1/bills");
+    const params = Object.fromEntries(url.searchParams);
+    requests.push(params);
+    return respond(200, { success: true, data: { bills: [{ _id: JSON.stringify(params) }] } });
+  };
+  const filters = { groupId: "g1", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: false };
+  const args = [filters, { ...filters, page: 2 }, { ...filters, search: "Wifi", isRecurring: true }, { groupId: "g1" }];
+  for (const arg of args) await store.dispatch(billsApi.endpoints.getGroupBills.initiate(arg, { subscribe: false })).unwrap();
+  assert.deepEqual(requests, [
+    { page: "1", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
+    { page: "2", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
+    { page: "1", limit: "10", search: "Wifi", category: "INTERNET", status: "PENDING", isRecurring: "true" },
+    { page: "1", limit: "10" },
+  ]);
+  for (const [index, arg] of args.entries()) assert.equal(billsApi.endpoints.getGroupBills.select(arg)(store.getState()).data.data.bills[0]._id, JSON.stringify(requests[index]));
+});
+
+test("Bills Fast Refresh replaces an older status-only endpoint", async () => {
+  signedIn();
+  api.injectEndpoints({ overrideExisting: true, endpoints: (builder) => ({
+    getGroupBills: builder.query({ query: ({ groupId, status }) => ({ url: `/groups/${groupId}/bills`, params: { status } }) }),
+  }) });
+  const previousDev = global.__DEV__;
+  const filename = require.resolve("../src/features/bills/billsApi.ts");
+  try {
+    global.__DEV__ = true;
+    delete require.cache[filename];
+    const refreshed = require(filename).billsApi;
+    global.fetch = async (request) => {
+      const url = new URL(request.url);
+      assert.equal(url.searchParams.get("category"), "WATER");
+      return respond(200, { success: true, data: { bills: [] } });
+    };
+    await store.dispatch(refreshed.endpoints.getGroupBills.initiate({ groupId: "g1", category: "WATER" }, { subscribe: false, forceRefetch: true })).unwrap();
+  } finally {
+    if (previousDev === undefined) delete global.__DEV__;
+    else global.__DEV__ = previousDev;
+  }
+});
