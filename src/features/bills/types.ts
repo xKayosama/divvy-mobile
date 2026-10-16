@@ -48,6 +48,7 @@ export type Bill = {
     email: string;
     avatar: string | null;
   } | null;
+  paidAt?: string | null;
   recurrenceSourceId?: string | null;
   occurrenceNumber?: number;
   generatedThrough?: number;

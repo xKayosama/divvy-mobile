@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
@@ -142,10 +143,23 @@ export default function HomeScreen() {
                 })}
               />
 
-              <Text className="text-sm text-muted-foreground">
-                Paid bills: {data.data.bills.paid} ·{" "}
-                {formatAmount(data.data.bills.paidAmount)}
-              </Text>
+              <View className="gap-2">
+                <Text className="text-sm text-muted-foreground">
+                  Paid bills: {data.data.bills.paid} ·{" "}
+                  {group?.currency ? `${group.currency} ` : ""}{formatAmount(data.data.bills.paidAmount)}
+                </Text>
+                <Button
+                  variant="outline"
+                  accessibilityLabel={`View paid bills, ${data.data.bills.paid} bills`}
+                  onPress={() => router.navigate({
+                    pathname: "/groups/[groupId]/bills",
+                    params: { groupId, status: "PAID", filterRequest: String(Date.now()) },
+                  })}
+                >
+                  <Text>View paid bills</Text>
+                  <Ionicons name="arrow-forward" size={18} color={colors.primary} accessible={false} />
+                </Button>
+              </View>
 
               {data.data.billReminders ? (
                 <BillReminders

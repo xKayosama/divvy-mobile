@@ -409,10 +409,31 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               </Text>
             ) : null}
 
-            {item.paidBy ? (
+            {item.status === "PAID" ? (
+              <View className="gap-2 rounded-2xl bg-secondary p-3">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="person-outline" size={16} color={colors.mutedForeground} accessible={false} />
+                  <Text className="flex-1 text-sm">
+                    Paid by {item.paidBy
+                      ? `${item.paidBy.firstName} ${item.paidBy.lastName}`.trim() || "Unknown member"
+                      : "Unknown member"}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="time-outline" size={16} color={colors.mutedForeground} accessible={false} />
+                  <Text className="flex-1 text-xs text-muted-foreground">
+                    {item.paidAt && Number.isFinite(new Date(item.paidAt).getTime())
+                      ? `Payment recorded ${new Date(item.paidAt).toLocaleString("en-PH", {
+                          month: "short", day: "numeric", year: "numeric",
+                          hour: "numeric", minute: "2-digit",
+                        })}`
+                      : "Payment date unavailable"}
+                  </Text>
+                </View>
+              </View>
+            ) : item.paidBy ? (
               <Text style={{ color: colors.mutedForeground }}>
-                {item.status === "PAID" ? "Paid by" : "Payer"}{" "}
-                {item.paidBy.firstName} {item.paidBy.lastName}
+                Payer {item.paidBy.firstName} {item.paidBy.lastName}
               </Text>
             ) : null}
 

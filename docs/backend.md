@@ -92,6 +92,11 @@ Source: `src/modules/groups/group.routes.js`, `group.controller.js`, and `groupA
 
 ## Bill creation and payment (verified 2026-10-15)
 
+### Payment timestamp (added 2026-10-16)
+
+- Bills now include nullable `paidAt` (ISO timestamp). Marking an unpaid bill PAID records server time in the same conditional update as status/payer. Creation directly with `status: "PAID"` also sets server time. Client-supplied `paidAt` is ignored; unpaid bills keep null. The existing paid-bill lock prevents duplicate/repeated payments from overwriting the date.
+- This is the time payment was recorded, not a historical payment date entered by the member. List/detail/create/update responses expose it; existing paid bills without a date return null. No migration or guessed backfill from `updatedAt` is performed. Mobile paid bill cards show the populated payer (or Unknown member) and the payment-recorded date/time in the device locale/timezone. Missing or invalid dates show Payment date unavailable. The dashboard View paid bills shortcut opens only PAID bills, resetting earlier search/filters and pagination.
+
 Source: `src/modules/bills/bill.routes.js`, `bill.controller.js`, `Bill.js`, group access middleware, and `src/app.js` mounts.
 
 - `POST /api/groups/:id/bills`: accepts `name`, positive `amount`, `category`, `dueDate`, optional `notes`, `paidBy`, `status`, `isRecurring`, and `recurrence`. HTTP 201 returns `data.bill` with populated payer. The mobile form offers Never (default), Weekly, Monthly, and Yearly repeat options. Never sends `isRecurring: false` without recurrence; recurring selections send `isRecurring: true` and `recurrence: "WEEKLY" | "MONTHLY" | "YEARLY"`. All are created without a payer and default to PENDING status. The due date anchors the recurrence schedule. It validates amounts to two decimals and real calendar dates, sending due dates at UTC midnight.
