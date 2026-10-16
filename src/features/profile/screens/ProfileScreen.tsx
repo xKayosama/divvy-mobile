@@ -68,7 +68,7 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
               }}
             >
               <Ionicons
-                name="arrow-back"
+                name="chevron-back"
                 size={22}
                 color={colors.foreground}
                 accessible={false}

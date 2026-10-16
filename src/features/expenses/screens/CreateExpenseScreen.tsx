@@ -285,7 +285,7 @@ export default function CreateExpenseScreen({
                   onPress={returnToExpenses}
                 >
                   <Ionicons
-                    name="arrow-back"
+                    name="chevron-back"
                     size={22}
                     color={colors.foreground}
                     accessible={false}

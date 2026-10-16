@@ -84,7 +84,7 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
                 onPress={back}
               >
                 <Ionicons
-                  name="arrow-back"
+                  name="chevron-back"
                   size={22}
                   color={colors.foreground}
                   accessible={false}

@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, TextInput, View } from "react-native";
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ScreenBackground from "@/components/layout/ScreenBackground";
@@ -30,6 +31,56 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState("");
+  const searchPending = searchText.trim() !== search;
+  const searchInput = useRef<TextInput>(null);
+  const searchProgress = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
+  const searchStyle = useAnimatedStyle(() => ({
+    height: searchProgress.get() * 50,
+    opacity: searchProgress.get(),
+    marginTop: -8 * (1 - searchProgress.get()),
+    overflow: "hidden",
+  }));
+
+  useEffect(() => {
+    searchProgress.set(withTiming(showSearch ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      reduceMotion: ReduceMotion.System,
+    }));
+    if (!showSearch) {
+      searchInput.current?.blur();
+      return;
+    }
+    const timer = setTimeout(() => searchInput.current?.focus(), reducedMotion ? 0 : 220);
+    return () => clearTimeout(timer);
+  }, [showSearch, searchProgress, reducedMotion]);
+
+  useEffect(() => {
+    if (!searchPending) return;
+    const timer = setTimeout(() => {
+      setSearch(searchText.trim());
+      setPage(1);
+      setConfirmId(null);
+      setDeleteError("");
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchText, searchPending]);
+
+  function clearSearch() {
+    setSearchText("");
+    setSearch("");
+    setPage(1);
+    setConfirmId(null);
+    setDeleteError("");
+  }
+
   const [filters, setFilters] = useState<ExpenseFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const hasFilters = !!(
@@ -46,8 +97,6 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
     setShowFilters(false);
   }
 
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
   const [deleteExpense, { isLoading: deleting }] = useDeleteExpenseMutation();
   const deletingRef = useRef(false);
 
@@ -71,11 +120,14 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
   const { data: groupsData } = useGetMyGroupsQuery();
   const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
-  const { currentData, isFetching, isError, error, refetch } =
+  const { currentData: queryData, isFetching, isError, error, refetch } =
     useGetGroupExpensesQuery(
-      { groupId, page, limit: 10, ...filters },
+      { groupId, page, limit: 10, ...filters, search: search || undefined },
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
+
+  const currentData = searchPending ? undefined : queryData;
+  const hasCriteria = hasFilters || !!search;
 
   function formatAmount(amount: number) {
     return new Intl.NumberFormat("en-PH", {
@@ -96,74 +148,129 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
     >
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
-        <Text className="text-3xl font-semibold tracking-tight">Expenses</Text>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">Expenses</Text>
+          <Button
+            variant={showSearch ? "default" : "outline"}
+            className="h-12 w-12 rounded-2xl p-0"
+            accessibilityLabel={showSearch ? "Close expense search" : "Search expenses"}
+            accessibilityState={{ expanded: showSearch }}
+            onPress={() => {
+              if (showSearch) clearSearch();
+              setShowSearch((value) => !value);
+            }}
+          >
+            <Ionicons
+              name={showSearch ? "close-outline" : "search-outline"}
+              size={21}
+              color={showSearch ? colors.primaryForeground : colors.foreground}
+              accessible={false}
+            />
+          </Button>
+          <Button
+            variant={hasFilters ? "default" : "outline"}
+            className="h-12 w-12 rounded-2xl p-0"
+            accessibilityLabel={hasFilters ? "Edit expense filters, filters active" : "Filter expenses"}
+            accessibilityState={{ selected: hasFilters }}
+            disabled={deleting}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons
+              name="options-outline"
+              size={21}
+              color={hasFilters ? colors.primaryForeground : colors.foreground}
+              accessible={false}
+            />
+          </Button>
+        </View>
 
         <Text className="text-sm text-muted-foreground">
           {group?.name ?? "Your group"}
           {group ? ` · ${group.currency}` : ""}
         </Text>
 
-        <Button
-          className="mt-3 h-12 rounded-2xl"
-          onPress={() =>
-            router.push({
-              pathname: "/groups/[groupId]/expenses/create",
-              params: { groupId },
-            })
-          }
-        >
-          <Ionicons
-            name="add"
-            size={22}
-            color={colors.primaryForeground}
-            accessible={false}
-          />
-          <Text>Add expense</Text>
-        </Button>
-
-        <Button
-          variant="outline"
-          onPress={() =>
-            router.push({
-              pathname: "/groups/[groupId]/expenses/scan",
-              params: { groupId },
-            })
-          }
-        >
-          <Ionicons
-            name="scan-outline"
-            size={20}
-            color={colors.primary}
-            accessible={false}
-          />
-          <Text>Scan receipt</Text>
-        </Button>
-
-        <View className="flex-row items-center gap-3">
+        <View className="mt-2 flex-row gap-2">
           <Button
-            variant="outline"
-            className="flex-1"
-            disabled={deleting}
-            onPress={() => setShowFilters(true)}
+            className="h-11 flex-1 rounded-xl"
+            onPress={() =>
+              router.push({
+                pathname: "/groups/[groupId]/expenses/create",
+                params: { groupId },
+              })
+            }
           >
             <Ionicons
-              name="filter-outline"
-              size={18}
-              color={colors.foreground}
+              name="add"
+              size={22}
+              color={colors.primaryForeground}
               accessible={false}
             />
-            <Text>{hasFilters ? "Edit filters" : "Filter expenses"}</Text>
+            <Text>Add expense</Text>
           </Button>
-          {hasFilters ? (
-            <Button
-              variant="ghost"
-              disabled={deleting}
-              onPress={() => applyFilters({})}
-            >
-              <Text>Clear</Text>
-            </Button>
-          ) : null}
+
+          <Button
+            variant="outline"
+            className="h-11 flex-1 rounded-xl"
+            onPress={() =>
+              router.push({
+                pathname: "/groups/[groupId]/expenses/scan",
+                params: { groupId },
+              })
+            }
+          >
+            <Ionicons
+              name="scan-outline"
+              size={20}
+              color={colors.primary}
+              accessible={false}
+            />
+            <Text>Scan receipt</Text>
+          </Button>
         </View>
+
+        <Animated.View
+          style={searchStyle}
+          pointerEvents={showSearch ? "auto" : "none"}
+          accessibilityElementsHidden={!showSearch}
+          importantForAccessibility={showSearch ? "auto" : "no-hide-descendants"}
+        >
+          <View className="min-h-12 flex-1 flex-row items-center rounded-2xl border border-border bg-card pl-3">
+            <Ionicons name="search-outline" size={20} color={colors.mutedForeground} accessible={false} />
+            <TextInput
+              ref={searchInput}
+              className="min-w-0 flex-1 px-3 py-3 text-base text-foreground"
+              style={{ minHeight: 48 }}
+              placeholder="Search expenses"
+              placeholderTextColor={colors.mutedForeground}
+              accessibilityLabel="Search expenses by description"
+              value={searchText}
+              onChangeText={setSearchText}
+              maxLength={200}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                setSearch(searchText.trim());
+                setPage(1);
+                setConfirmId(null);
+                setDeleteError("");
+              }}
+            />
+            {searchText ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear expense search"
+                className="h-12 w-12 items-center justify-center"
+                onPress={() => {
+                  clearSearch();
+                  searchInput.current?.focus();
+                }}
+              >
+                <Ionicons name="close-circle" size={21} color={colors.mutedForeground} accessible={false} />
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
         {hasFilters ? (
           <Text className="text-xs text-muted-foreground">
             {[
@@ -178,11 +285,11 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
         {currentData ? (
           <Text className="text-xs text-muted-foreground">
             {currentData.pagination.total}{" "}
-            {hasFilters ? "matching" : "recorded"} expenses
+            {hasCriteria ? "matching" : "recorded"} expenses
           </Text>
         ) : null}
 
-        {isError ? (
+        {isError && !searchPending ? (
           <View className="mt-3 gap-3">
             <Text accessibilityLiveRegion="polite">
               {authError(error, "Unable to load expenses. Try again.")}
@@ -203,10 +310,10 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
             paddingBottom: tabContentBottomInset(insets.bottom),
           }}
         >
-          {isFetching ? (
+          {isFetching || searchPending ? (
             <View className="items-center gap-3 py-10">
               <ActivityIndicator color={colors.primary} />
-              <Text>Loading expenses…</Text>
+              <Text>{searchPending || search ? "Searching expenses…" : "Loading expenses…"}</Text>
             </View>
           ) : !isError ? (
             <View className="items-center gap-3 rounded-[24px] bg-card px-6 py-10">
@@ -220,17 +327,20 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
               </View>
 
               <Text className="text-lg font-semibold">
-                {hasFilters ? "No matching expenses" : "No expenses yet"}
+                {hasCriteria ? "No expenses found" : "No expenses yet"}
               </Text>
 
               <Text className="text-center text-sm text-muted-foreground">
-                {hasFilters
-                  ? "Try a different category or date range, or clear your filters."
+                {hasCriteria
+                  ? "Try another description, category or date range."
                   : `No expenses have been recorded for ${group?.name ?? "this group"}. Tap Add expense to record one.`}
               </Text>
-              {hasFilters ? (
-                <Button variant="outline" onPress={() => applyFilters({})}>
-                  <Text>Clear filters</Text>
+              {hasCriteria ? (
+                <Button variant="outline" onPress={() => {
+                  clearSearch();
+                  applyFilters({});
+                }}>
+                  <Text>Clear search and filters</Text>
                 </Button>
               ) : null}
             </View>
@@ -238,6 +348,8 @@ export default function ExpensesScreen({ groupId }: { groupId: string }) {
         </View>
       ) : (
         <FlatList
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           scrollIndicatorInsets={{
             bottom: tabContentBottomInset(insets.bottom),
           }}

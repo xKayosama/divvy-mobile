@@ -58,6 +58,7 @@ export type GetExpensesRequest = {
   groupId: string;
   page?: number;
   limit?: number;
+  search?: string;
   category?: ExpenseCategory;
   startDate?: string;
   endDate?: string;

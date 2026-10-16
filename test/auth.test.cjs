@@ -329,7 +329,7 @@ test("expense filters reject impossible and reversed dates but allow open ranges
   );
 });
 
-test("expense filters reach the server and use separate caches for ranges and pages", async () => {
+test("expense search and filters reach the server and use separate caches for ranges and pages", async () => {
   signedIn();
   const requests = [];
   global.fetch = async (request) => {
@@ -344,6 +344,7 @@ test("expense filters reach the server and use separate caches for ranges and pa
   };
   const filters = {
     groupId: "g1",
+    search: "Meal + snacks",
     category: "FOOD",
     startDate: "2026-10-01",
     endDate: "2026-10-15",
@@ -351,6 +352,7 @@ test("expense filters reach the server and use separate caches for ranges and pa
   const args = [
     filters,
     { ...filters, page: 2 },
+    { ...filters, search: "Rent" },
     { groupId: "g1", endDate: "2026-10-15" },
     { groupId: "g1" },
   ];
@@ -367,6 +369,7 @@ test("expense filters reach the server and use separate caches for ranges and pa
     {
       page: "1",
       limit: "10",
+      search: "Meal + snacks",
       category: "FOOD",
       startDate: "2026-10-01",
       endDate: "2026-10-15",
@@ -374,10 +377,12 @@ test("expense filters reach the server and use separate caches for ranges and pa
     {
       page: "2",
       limit: "10",
+      search: "Meal + snacks",
       category: "FOOD",
       startDate: "2026-10-01",
       endDate: "2026-10-15",
     },
+    { page: "1", limit: "10", search: "Rent", category: "FOOD", startDate: "2026-10-01", endDate: "2026-10-15" },
     { page: "1", limit: "10", endDate: "2026-10-15" },
     { page: "1", limit: "10" },
   ]);
