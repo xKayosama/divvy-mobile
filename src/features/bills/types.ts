@@ -1,3 +1,5 @@
+export type BillSort = "due_soonest" | "due_latest" | "amount_high" | "amount_low";
+
 export type BillCategory =
   | "RENT"
   | "ELECTRICITY"
@@ -63,6 +65,7 @@ export type GetBillsRequest = {
   status?: BillStatus;
   category?: BillCategory;
   search?: string;
+  sort?: BillSort;
   isRecurring?: boolean;
 };
 

@@ -91,7 +91,7 @@ export const billsApi = api
               ],
       }),
       getGroupBills: builder.query<BillsResponse, GetBillsRequest>({
-        query: ({ groupId, page = 1, limit = 10, status, category, search, isRecurring }) => ({
+        query: ({ groupId, page = 1, limit = 10, status, category, search, isRecurring, sort }) => ({
           url: `/groups/${encodeURIComponent(groupId)}/bills`,
           params: {
             page,
@@ -99,6 +99,7 @@ export const billsApi = api
             ...(status ? { status } : {}),
             category,
             search,
+            sort,
             isRecurring,
           },
         }),

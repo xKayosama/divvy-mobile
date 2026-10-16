@@ -1,3 +1,4 @@
+import { ListSortControl } from "@/components/ui/list-sort-control";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -15,13 +16,14 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { useGetGroupBillsQuery } from "../billsApi";
 import { billCategories } from "../billForm";
 import BillFiltersModal, { type BillFilters } from "../components/BillFiltersModal";
-import type { BillStatus } from "../types";
+import type { BillStatus, BillSort } from "../types";
 import BillStatusBadge from "../components/BillStatusBadge";
 
 export default function BillsScreen({ groupId, initialStatus }: { groupId: string; initialStatus?: BillStatus }) {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<BillSort>("due_soonest");
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
@@ -90,7 +92,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
 
   const { currentData: queryData, isFetching, isError, error, refetch } =
     useGetGroupBillsQuery(
-      { groupId, page, limit: 10, ...filters, search: search || undefined },
+      { groupId, page, limit: 10, ...filters, sort, search: search || undefined },
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
@@ -124,11 +126,11 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
     >
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">Bills</Text>
+        <View className="flex-row items-center justify-between gap-2">
+          <Text className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">Bills</Text>
           <Button
             variant={showSearch ? "default" : "outline"}
-            className="h-12 w-12 rounded-2xl p-0"
+            className="h-11 w-11 rounded-2xl p-0"
             accessibilityLabel={showSearch ? "Close bill search" : "Search bills"}
             accessibilityState={{ expanded: showSearch }}
             onPress={() => {
@@ -145,7 +147,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
           </Button>
           <Button
             variant={hasFilters ? "default" : "outline"}
-            className="h-12 w-12 rounded-2xl p-0"
+            className="h-11 w-11 rounded-2xl p-0"
             accessibilityLabel={hasFilters ? "Edit bill filters, filters active" : "Filter bills"}
             accessibilityState={{ selected: hasFilters }}
             onPress={() => setShowFilters(true)}
@@ -157,6 +159,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               accessible={false}
             />
           </Button>
+          <ListSortControl title="Bills" value={sort} defaultValue="due_soonest" options={[{ value: "due_soonest", label: "Nearest due date" },{ value: "due_latest", label: "Latest due date" },{ value: "amount_high", label: "Highest amount" },{ value: "amount_low", label: "Lowest amount" }]} onChange={value => { setSort(value); setPage(1); }} />
         </View>
 
         <Text style={{ color: colors.mutedForeground }}>

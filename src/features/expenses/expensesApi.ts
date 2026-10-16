@@ -61,12 +61,13 @@ export const expensesApi = api
           page = 1,
           limit = 10,
           search,
+          sort,
           category,
           startDate,
           endDate,
         }) => ({
           url: `/groups/${encodeURIComponent(groupId)}/expenses`,
-          params: { page, limit, search, category, startDate, endDate },
+          params: { page, limit, search, sort, category, startDate, endDate },
         }),
         providesTags: (_result, _error, { groupId }) => [
           { type: "Expenses", id: groupId },

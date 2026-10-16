@@ -1,3 +1,5 @@
+export type ExpenseSort = "newest" | "oldest" | "amount_high" | "amount_low";
+
 export type ExpenseUser = {
   _id: string;
   firstName: string;
@@ -59,6 +61,7 @@ export type GetExpensesRequest = {
   page?: number;
   limit?: number;
   search?: string;
+  sort?: ExpenseSort;
   category?: ExpenseCategory;
   startDate?: string;
   endDate?: string;

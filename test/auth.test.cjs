@@ -1491,3 +1491,32 @@ for (const status of [403, 404, 500]) {
     assert.equal(expensesApi.endpoints.getExpense.select("missing")(store.getState()).data, undefined);
   });
 }
+
+for (const [name, endpoint, values, filters] of [
+  ["expenses", expensesApi.endpoints.getGroupExpenses, ["newest", "oldest", "amount_high", "amount_low"], { search: "Meal", category: "FOOD", startDate: "2026-10-01", endDate: "2026-10-31" }],
+  ["bills", billsApi.endpoints.getGroupBills, ["due_soonest", "due_latest", "amount_high", "amount_low"], { search: "Rent", category: "RENT", status: "PENDING", isRecurring: false }],
+]) {
+  test(`${name} sorting reaches the server with filters and separates sort/page caches`, async () => {
+    signedIn();
+    let reads = 0;
+    global.fetch = async request => {
+      reads++;
+      const url = new URL(request.url);
+      assert.equal(url.pathname, `/api/groups/g1/${name}`);
+      for (const [key, value] of Object.entries(filters)) assert.equal(url.searchParams.get(key), String(value));
+      return respond(200, { success: true, data: { [name]: [{ _id: `${url.searchParams.get("sort")}:${url.searchParams.get("page")}` }] } });
+    };
+    for (const sort of values) {
+      for (const page of [1, 2]) {
+        const args = { groupId: "g1", ...filters, sort, page };
+        const result = await store.dispatch(endpoint.initiate(args, { subscribe: false })).unwrap();
+        assert.equal(result.data[name][0]._id, `${sort}:${page}`);
+        assert.equal(endpoint.select(args)(store.getState()).data.data[name][0]._id, `${sort}:${page}`);
+      }
+    }
+    assert.equal(reads, 8);
+    const cached = await store.dispatch(endpoint.initiate({ groupId: "g1", ...filters, sort: values[0], page: 1 }, { subscribe: false })).unwrap();
+    assert.equal(cached.data[name][0]._id, `${values[0]}:1`);
+    assert.equal(reads, 8);
+  });
+}

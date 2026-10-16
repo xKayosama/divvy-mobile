@@ -1,3 +1,5 @@
+import { ListSortControl } from "@/components/ui/list-sort-control";
+import type { ExpenseSort } from "../types";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +30,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<ExpenseSort>("newest");
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -91,7 +94,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
 
   const { currentData: queryData, isFetching, isError, error, refetch } =
     useGetGroupExpensesQuery(
-      { groupId, page, limit: 10, ...filters, search: search || undefined },
+      { groupId, page, limit: 10, ...filters, sort, search: search || undefined },
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
@@ -117,11 +120,11 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
     >
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">Expenses</Text>
+        <View className="flex-row items-center justify-between gap-2">
+          <Text className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">Expenses</Text>
           <Button
             variant={showSearch ? "default" : "outline"}
-            className="h-12 w-12 rounded-2xl p-0"
+            className="h-11 w-11 rounded-2xl p-0"
             accessibilityLabel={showSearch ? "Close expense search" : "Search expenses"}
             accessibilityState={{ expanded: showSearch }}
             onPress={() => {
@@ -138,7 +141,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
           </Button>
           <Button
             variant={hasFilters ? "default" : "outline"}
-            className="h-12 w-12 rounded-2xl p-0"
+            className="h-11 w-11 rounded-2xl p-0"
             accessibilityLabel={hasFilters ? "Edit expense filters, filters active" : "Filter expenses"}
             accessibilityState={{ selected: hasFilters }}
             onPress={() => setShowFilters(true)}
@@ -150,6 +153,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
               accessible={false}
             />
           </Button>
+          <ListSortControl title="Expenses" value={sort} defaultValue="newest" options={[{ value: "newest", label: "Newest first" },{ value: "oldest", label: "Oldest first" },{ value: "amount_high", label: "Highest amount" },{ value: "amount_low", label: "Lowest amount" }]} onChange={value => { setSort(value); setPage(1); }} />
         </View>
 
         <Text className="text-sm text-muted-foreground">
