@@ -9,8 +9,9 @@ import {
   ScrollView,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { FormField, FormMessage } from "@/components/auth/FormField";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { FormMessage } from "@/components/auth/FormField";
+import DateField from "@/components/ui/date-field";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import {
@@ -47,6 +48,7 @@ export default function ExpenseFiltersModal({
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
+      <SafeAreaProvider>
       <SafeAreaView className="flex-1 bg-background">
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -56,9 +58,25 @@ export default function ExpenseFiltersModal({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ padding: 20, gap: 20 }}
           >
-            <Text accessibilityRole="header" className="text-3xl font-semibold">
-              Filter expenses
-            </Text>
+            <View className="flex-row items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                accessibilityLabel="Back to expenses"
+                onPress={onClose}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={22}
+                  color={colors.foreground}
+                  accessible={false}
+                />
+              </Button>
+              <Text accessibilityRole="header" className="flex-1 text-3xl font-semibold">
+                Filter expenses
+              </Text>
+            </View>
             <Text className="font-semibold">Category</Text>
             <View className="flex-row flex-wrap gap-2">
               {[undefined, ...expenseCategories].map((value) => (
@@ -84,24 +102,26 @@ export default function ExpenseFiltersModal({
                 </Button>
               ))}
             </View>
-            <FormField
+            <DateField
               label="Start date (optional)"
-              icon="calendar-outline"
-              placeholder="YYYY-MM-DD"
               value={startDate}
-              onChangeText={setStartDate}
-              autoCapitalize="none"
-              autoCorrect={false}
+              onChange={setStartDate}
             />
-            <FormField
+            {startDate ? (
+              <Button variant="ghost" onPress={() => setStartDate("")}>
+                <Text>Clear start date</Text>
+              </Button>
+            ) : null}
+            <DateField
               label="End date (optional)"
-              icon="calendar-outline"
-              placeholder="YYYY-MM-DD"
               value={endDate}
-              onChangeText={setEndDate}
-              autoCapitalize="none"
-              autoCorrect={false}
+              onChange={setEndDate}
             />
+            {endDate ? (
+              <Button variant="ghost" onPress={() => setEndDate("")}>
+                <Text>Clear end date</Text>
+              </Button>
+            ) : null}
             <Text className="text-sm text-muted-foreground">
               Leave either date blank for no limit. Both dates are included,
               using UTC days.
@@ -119,6 +139,7 @@ export default function ExpenseFiltersModal({
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

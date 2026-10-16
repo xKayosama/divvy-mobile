@@ -42,6 +42,21 @@ Mobile authentication now has typed responses, native secure token persistence (
 
 Keep credentials, tokens, and environment secrets out of this document.
 
+## Bill creation and payment (verified 2026-10-15)
+
+Source: `src/modules/bills/bill.routes.js`, `bill.controller.js`, `Bill.js`, group access middleware, and `src/app.js` mounts.
+
+- `POST /api/groups/:id/bills`: accepts `name`, positive `amount`, `category`, `dueDate`, optional `notes`, `paidBy`, `status`, `isRecurring`, and `recurrence`. HTTP 201 returns `data.bill` with populated payer. The mobile form offers Never (default), Weekly, Monthly, and Yearly repeat options. Never sends `isRecurring: false` without recurrence; recurring selections send `isRecurring: true` and `recurrence: "WEEKLY" | "MONTHLY" | "YEARLY"`. All are created without a payer and default to PENDING status. The due date anchors the recurrence schedule. It validates amounts to two decimals and real calendar dates, sending due dates at UTC midnight.
+- Categories: RENT, ELECTRICITY, WATER, INTERNET, PHONE, SUBSCRIPTION, INSURANCE, OTHER.
+- `GET /api/bills/:billId`: HTTP 200 returns `data.bill`. Missing bills return 404; nonmembers return 403.
+- `PUT /api/bills/:billId`: partial updates; omitted fields retain existing values. Marking paid sends `{ status: "PAID", paidBy: "<active member user ID>" }`; HTTP 200 returns `data.bill`. Any supplied payer must be an ACTIVE member. Mobile explicitly asks who paid and confirms the bill name/amount before saving.
+- Creation and updates require bearer authentication and ACTIVE group membership, with no owner-only restriction. Backend errors are surfaced with retryable form state.
+- Paying a bill updates its status/payer only: no expense, split, transfer, or member balance entry is created. Mobile invalidates bill lists and dashboard caches after creation/payment, plus bill detail after payment. Dashboard bill totals/upcoming bills refetch; expense balances are independent.
+- Recurring creation reverified against the bills routes/controller on 2026-10-15: a supported recurrence is required when `isRecurring` is true; a recurrence must not be provided for a one-time bill.
+- Unpaid bills support editing/deletion in mobile. Edit prepopulates the bill form; generated occurrences cannot become recurring sources. Deleting a recurring source stops future generation but retains already generated bills; deleting an occurrence removes only that occurrence.
+- Paid-bill lock added to the backend on 2026-10-15: `PUT /api/bills/:billId` and `DELETE /api/bills/:billId` return HTTP 409 for PAID bills, including attempts to reopen them. Membership is checked first. Conditional database writes/deletes also reject bills paid concurrently after the initial read. Conflicts return 409 with a message to reload.
+- Mobile hides edit/delete on paid bills, blocks direct edit links, and requires deletion confirmation showing name/amount and recurrence effects. Successful changes refresh lists/detail/dashboard; 409 conflicts also refetch these caches so paid bills become locked in the UI. Existing unpaid recurring bills/occurrences can still be marked paid without altering recurrence settings.
+
 ## Expense integration
 
 - `GET /api/groups/:id/expenses` returns `data.expenses` and top-level `pagination`; accepts `page`, `limit` (1–100), `category`, `startDate`, and `endDate` (`YYYY-MM-DD`). Results sort by date and creation time descending.

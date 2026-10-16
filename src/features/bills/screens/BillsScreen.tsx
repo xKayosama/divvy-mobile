@@ -1,30 +1,54 @@
-import { useState } from "react";
-import {
-    ActivityIndicator,
-    FlatList,
-    Pressable,
-    Text,
-    View,
-} from "react-native";
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useTheme } from "@/theme/ThemeProvider";
 import ScreenBackground from "@/components/layout/ScreenBackground";
 import { tabContentBottomInset } from "@/constants/navigation";
 import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
-import { useGetGroupBillsQuery } from "../billsApi";
+import { useTheme } from "@/theme/ThemeProvider";
+import { useDeleteBillMutation, useGetGroupBillsQuery } from "../billsApi";
+import { billCategories } from "../billForm";
 import BillStatusBadge from "../components/BillStatusBadge";
 
 export default function BillsScreen({ groupId }: { groupId: string }) {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteBill, { isLoading: deleting }] = useDeleteBillMutation();
+  const deletingRef = useRef(false);
+
+  async function remove(billId: string) {
+    if (deletingRef.current) return;
+    if (
+      !currentData?.data.bills.some(
+        (bill) => bill._id === billId && bill.status !== "PAID",
+      )
+    )
+      return;
+    deletingRef.current = true;
+    setDeleteError("");
+    try {
+      await deleteBill({ groupId, billId }).unwrap();
+      setConfirmId(null);
+      setPage(1);
+    } catch (error) {
+      setDeleteError(
+        authError(error, "Could not delete this bill. Try again."),
+      );
+    } finally {
+      deletingRef.current = false;
+    }
+  }
 
   const { data: groupsData } = useGetMyGroupsQuery();
-  const group = groupsData?.data.groups.find(
-    (item) => item.id === groupId,
-  );
+  const group = groupsData?.data.groups.find((item) => item.id === groupId);
 
   const { currentData, isFetching, isError, error, refetch } =
     useGetGroupBillsQuery(
@@ -60,12 +84,10 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
     >
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
-        <Text style={{ color: colors.secondaryForeground, fontSize: 11, fontWeight: "600", letterSpacing: 2 }}>
-          STAY ON TRACK
-        </Text>
         <Text
           style={{
             fontSize: 30,
+            lineHeight: 38,
             fontWeight: "700",
             color: colors.foreground,
           }}
@@ -78,9 +100,27 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
           {group ? ` · ${group.currency}` : ""}
         </Text>
 
+        <Button
+          className="mt-3"
+          onPress={() =>
+            router.push({
+              pathname: "/groups/[groupId]/bills/create",
+              params: { groupId },
+            })
+          }
+        >
+          <Ionicons
+            name="add"
+            size={20}
+            color={colors.primaryForeground}
+            accessible={false}
+          />
+          <Text>Add bill</Text>
+        </Button>
         {pagination ? (
           <Text style={{ color: colors.mutedForeground }}>
-            {pagination.total} {pagination.total === 1 ? "bill" : "bills"} recorded
+            {pagination.total} {pagination.total === 1 ? "bill" : "bills"}{" "}
+            recorded
           </Text>
         ) : null}
 
@@ -124,9 +164,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
           isFetching ? (
             <View style={{ alignItems: "center", gap: 12, padding: 32 }}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={{ color: colors.foreground }}>
-                Loading bills…
-              </Text>
+              <Text style={{ color: colors.foreground }}>Loading bills…</Text>
             </View>
           ) : !isError ? (
             <View style={{ alignItems: "center", gap: 8, padding: 32 }}>
@@ -140,7 +178,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
                 No bills yet
               </Text>
               <Text style={{ color: colors.mutedForeground }}>
-                Your group’s bills will appear here.
+                Tap Add bill to record a bill and its due date.
               </Text>
             </View>
           ) : null
@@ -156,10 +194,17 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
             <View
               style={{
                 flexDirection: "row",
+                alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
               }}
             >
+              <Ionicons
+                name={billCategories[item.category] ?? billCategories.OTHER}
+                size={24}
+                color={colors.primary}
+                accessible={false}
+              />
               <Text
                 style={{
                   flex: 1,
@@ -192,16 +237,30 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
+                timeZone: "UTC",
               })}
             </Text>
 
             {item.isRecurring && item.recurrence ? (
-              <Text style={{ color: colors.primary }}>
-                Repeats {item.recurrence.toLowerCase()}
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Ionicons
+                  name="repeat-outline"
+                  size={18}
+                  color={colors.primary}
+                  accessible={false}
+                />
+                <Text style={{ color: colors.primary, flex: 1 }}>
+                  Recurring bill ·{" "}
+                  {item.recurrence === "WEEKLY"
+                    ? "Every week"
+                    : item.recurrence === "MONTHLY"
+                      ? "Every month"
+                      : "Every year"}
+                </Text>
+              </View>
             ) : item.recurrenceSourceId ? (
               <Text style={{ color: colors.mutedForeground }}>
-                Recurring bill occurrence
+                Part of a recurring bill
               </Text>
             ) : null}
 
@@ -212,6 +271,123 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
               </Text>
             ) : null}
 
+            {item.status !== "PAID" ? (
+              <Button
+                disabled={deleting}
+                variant="outline"
+                accessibilityLabel={`Mark ${item.name} as paid`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/groups/[groupId]/bills/[billId]/pay",
+                    params: { groupId, billId: item._id },
+                  })
+                }
+              >
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color={colors.foreground}
+                  accessible={false}
+                />
+                <Text>Mark as paid</Text>
+              </Button>
+            ) : null}
+            {item.status === "PAID" ? (
+              <View className="flex-row items-center gap-2">
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={14}
+                  color={colors.mutedForeground}
+                  accessible={false}
+                />
+                <Text className="text-xs text-muted-foreground">
+                  Paid bills cannot be edited or deleted.
+                </Text>
+              </View>
+            ) : confirmId === item._id ? (
+              <View className="gap-3 border-t border-border pt-3">
+                <Text accessibilityLiveRegion="polite">
+                  Delete “{item.name}” (
+                  {group?.currency ? `${group.currency} ` : ""}
+                  {formatAmount(item.amount)})? This cannot be undone.
+                </Text>
+                <Text className="text-sm text-muted-foreground">
+                  {item.isRecurring
+                    ? "This stops future generation from this bill. Bills already generated remain unchanged."
+                    : item.recurrenceSourceId
+                      ? "Only this occurrence will be removed. The recurring schedule continues."
+                      : "This removes the bill from your group."}
+                </Text>
+                {deleteError ? (
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    className="text-destructive"
+                  >
+                    {deleteError}
+                  </Text>
+                ) : null}
+                <View className="flex-row flex-wrap gap-3">
+                  <Button
+                    variant="destructive"
+                    disabled={deleting}
+                    onPress={() => void remove(item._id)}
+                  >
+                    <Text>{deleting ? "Deleting…" : "Confirm delete"}</Text>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={deleting}
+                    onPress={() => {
+                      setConfirmId(null);
+                      setDeleteError("");
+                    }}
+                  >
+                    <Text>Cancel</Text>
+                  </Button>
+                </View>
+              </View>
+            ) : (
+              <View className="flex-row gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={deleting}
+                  accessibilityLabel={`Edit ${item.name}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/groups/[groupId]/bills/[billId]/edit",
+                      params: { groupId, billId: item._id },
+                    })
+                  }
+                >
+                  <Ionicons
+                    name="create-outline"
+                    size={18}
+                    color={colors.foreground}
+                    accessible={false}
+                  />
+                  <Text>Edit</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={deleting}
+                  accessibilityLabel={`Delete ${item.name}`}
+                  onPress={() => {
+                    setConfirmId(item._id);
+                    setDeleteError("");
+                  }}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color={colors.destructive}
+                    accessible={false}
+                  />
+                  <Text className="text-destructive">Delete</Text>
+                </Button>
+              </View>
+            )}
             {item.notes ? (
               <Text style={{ color: colors.mutedForeground }}>
                 {item.notes}
@@ -260,9 +436,7 @@ export default function BillsScreen({ groupId }: { groupId: string }) {
                         opacity: disabled ? 0.4 : 1,
                       }}
                     >
-                      <Text style={{ color: colors.primary }}>
-                        {label}
-                      </Text>
+                      <Text style={{ color: colors.primary }}>{label}</Text>
                     </Pressable>
                   );
                 })}

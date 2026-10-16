@@ -389,3 +389,266 @@ test("expense filters reach the server and use separate caches for ranges and pa
     );
   }
 });
+
+const { billsApi } = require("../src/features/bills/billsApi.ts");
+const { validateBillForm } = require("../src/features/bills/billForm.ts");
+
+test("bill form validates required fields, money, and real calendar dates", () => {
+  assert.equal(validateBillForm("Rent", "1200.50", "2028-02-29"), "");
+  assert.match(validateBillForm(" ", "10", "2026-10-15"), /name/);
+  for (const amount of ["0", "-1", "1.234", "Infinity", "1e3", ""]) {
+    assert.match(validateBillForm("Rent", amount, "2026-10-15"), /amount/);
+  }
+  for (const date of ["2026-02-29", "2026-04-31", "15/10/2026", ""]) {
+    assert.match(validateBillForm("Rent", "10", date), /due date/);
+  }
+});
+
+for (const operation of ["createBill", "markBillPaid"]) {
+  test(`${operation} sends the backend contract and refreshes bill lists and dashboard`, async () => {
+    signedIn();
+    const bill = {
+      _id: "b1",
+      groupId: "g1",
+      name: "Electricity",
+      status: "PENDING",
+    };
+    const body = {
+      name: "Electricity",
+      amount: 123.45,
+      category: "ELECTRICITY",
+      dueDate: "2026-10-20T00:00:00.000Z",
+      notes: "Account 123",
+      isRecurring: false,
+    };
+    const reads = { list: 0, dashboard: 0, detail: 0 };
+    global.fetch = async (request) => {
+      assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+      if (request.method !== "GET") {
+        assert.equal(
+          request.url,
+          operation === "createBill"
+            ? "https://divvy.test/api/groups/g1/bills"
+            : "https://divvy.test/api/bills/b1",
+        );
+        assert.equal(
+          request.method,
+          operation === "createBill" ? "POST" : "PUT",
+        );
+        assert.deepEqual(
+          await request.json(),
+          operation === "createBill" ? body : { status: "PAID", paidBy: "u1" },
+        );
+        return respond(operation === "createBill" ? 201 : 200, {
+          success: true,
+          data: { bill },
+        });
+      }
+      if (request.url.includes("/dashboard")) {
+        reads.dashboard++;
+        return respond(200, { success: true, data: {} });
+      }
+      if (request.url.includes("/groups/g1/bills")) {
+        reads.list++;
+        return respond(200, { success: true, data: { bills: [bill] } });
+      }
+      assert.equal(request.url, "https://divvy.test/api/bills/b1");
+      reads.detail++;
+      return respond(200, { success: true, data: { bill } });
+    };
+    const queries = [
+      store.dispatch(
+        billsApi.endpoints.getGroupBills.initiate({ groupId: "g1" }),
+      ),
+      store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+      store.dispatch(billsApi.endpoints.getBill.initiate("b1")),
+    ];
+    try {
+      await Promise.all(queries.map((query) => query.unwrap()));
+      await store
+        .dispatch(
+          billsApi.endpoints[operation].initiate({
+            groupId: "g1",
+            billId: "b1",
+            paidBy: "u1",
+            body,
+          }),
+        )
+        .unwrap();
+      await Promise.all(
+        store
+          .dispatch(api.util.getRunningQueriesThunk())
+          .map((query) => query.unwrap()),
+      );
+      assert.deepEqual(reads, {
+        list: 2,
+        dashboard: 2,
+        detail: operation === "createBill" ? 1 : 2,
+      });
+    } finally {
+      queries.forEach((query) => query.unsubscribe());
+    }
+  });
+}
+
+test("bill payment failure preserves cached bills and session for retry", async () => {
+  signedIn();
+  let reads = 0;
+  global.fetch = async (request) => {
+    if (request.method === "GET") {
+      reads++;
+      return respond(200, {
+        success: true,
+        data: { bills: [{ _id: "b1", status: "PENDING" }] },
+      });
+    }
+    return respond(400, {
+      success: false,
+      message: "The payer is not an active member of this group.",
+    });
+  };
+  const query = store.dispatch(
+    billsApi.endpoints.getGroupBills.initiate({ groupId: "g1" }),
+  );
+  try {
+    await query.unwrap();
+    await assert.rejects(
+      store
+        .dispatch(
+          billsApi.endpoints.markBillPaid.initiate({
+            groupId: "g1",
+            billId: "b1",
+            paidBy: "u2",
+          }),
+        )
+        .unwrap(),
+      (error) => error.status === 400,
+    );
+    assert.equal(reads, 1);
+    assert.equal(store.getState().auth.token, "saved-token");
+    assert.equal(
+      billsApi.endpoints.getGroupBills.select({ groupId: "g1" })(
+        store.getState(),
+      ).data.data.bills[0].status,
+      "PENDING",
+    );
+  } finally {
+    query.unsubscribe();
+  }
+});
+
+for (const operation of ["updateBill", "deleteBill"]) {
+  test(`${operation} uses the bill endpoint and refreshes list, detail and dashboard`, async () => {
+    signedIn();
+    const bill = { _id: "b1", groupId: "g1", name: "Rent", status: "PENDING" };
+    const body = {
+      name: "Updated rent",
+      amount: 1250,
+      category: "RENT",
+      dueDate: "2026-10-20T00:00:00.000Z",
+      notes: "Corrected",
+      isRecurring: false,
+      recurrence: null,
+    };
+    const reads = { list: 0, detail: 0, dashboard: 0 };
+    global.fetch = async (request) => {
+      assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+      if (request.method !== "GET") {
+        assert.equal(request.url, "https://divvy.test/api/bills/b1");
+        assert.equal(
+          request.method,
+          operation === "updateBill" ? "PUT" : "DELETE",
+        );
+        if (operation === "updateBill")
+          assert.deepEqual(await request.json(), body);
+        else assert.equal(await request.text(), "");
+        return respond(200, { success: true, data: { bill } });
+      }
+      if (request.url.includes("/dashboard")) {
+        reads.dashboard++;
+        return respond(200, { success: true, data: {} });
+      }
+      if (request.url.includes("/groups/g1/bills")) {
+        reads.list++;
+        return respond(200, { success: true, data: { bills: [bill] } });
+      }
+      reads.detail++;
+      return respond(200, { success: true, data: { bill } });
+    };
+    const queries = [
+      store.dispatch(
+        billsApi.endpoints.getGroupBills.initiate({ groupId: "g1" }),
+      ),
+      store.dispatch(billsApi.endpoints.getBill.initiate("b1")),
+      store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1")),
+    ];
+    try {
+      await Promise.all(queries.map((query) => query.unwrap()));
+      await store
+        .dispatch(
+          billsApi.endpoints[operation].initiate({
+            groupId: "g1",
+            billId: "b1",
+            body,
+          }),
+        )
+        .unwrap();
+      await Promise.all(
+        store
+          .dispatch(api.util.getRunningQueriesThunk())
+          .map((query) => query.unwrap()),
+      );
+      assert.deepEqual(reads, { list: 2, detail: 2, dashboard: 2 });
+    } finally {
+      queries.forEach((query) => query.unsubscribe());
+    }
+  });
+  test(`${operation} refreshes locked bill state after a concurrent payment`, async () => {
+    signedIn();
+    let reads = 0;
+    global.fetch = async (request) => {
+      if (request.method === "GET") {
+        reads++;
+        return respond(200, {
+          success: true,
+          data: {
+            bill: { _id: "b1", status: reads === 1 ? "PENDING" : "PAID" },
+          },
+        });
+      }
+      return respond(409, {
+        success: false,
+        message: "Paid bills cannot be edited or deleted.",
+      });
+    };
+    const query = store.dispatch(billsApi.endpoints.getBill.initiate("b1"));
+    try {
+      await query.unwrap();
+      await assert.rejects(
+        store
+          .dispatch(
+            billsApi.endpoints[operation].initiate({
+              groupId: "g1",
+              billId: "b1",
+              body: {},
+            }),
+          )
+          .unwrap(),
+        (error) => error.status === 409,
+      );
+      await Promise.all(
+        store
+          .dispatch(api.util.getRunningQueriesThunk())
+          .map((query) => query.unwrap()),
+      );
+      assert.equal(reads, 2);
+      assert.equal(
+        billsApi.endpoints.getBill.select("b1")(store.getState()).data.data.bill
+          .status,
+        "PAID",
+      );
+    } finally {
+      query.unsubscribe();
+    }
+  });
+}

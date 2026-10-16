@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
+import DateField from "@/components/ui/date-field";
 import { Text } from "@/components/ui/text";
 import { authError } from "@/features/auth/errors";
 import {
@@ -254,9 +255,26 @@ export default function CreateExpenseScreen({
         >
           <View className="gap-6">
             <View className="gap-2">
-              <Text className="text-3xl font-semibold tracking-tight">
-                {expense ? "Edit expense" : "Add expense"}
-              </Text>
+              <View className="flex-row items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full"
+                  accessibilityLabel="Back to expenses"
+                  disabled={saving}
+                  onPress={returnToExpenses}
+                >
+                  <Ionicons
+                    name="arrow-back"
+                    size={22}
+                    color={colors.foreground}
+                    accessible={false}
+                  />
+                </Button>
+                <Text className="flex-1 text-3xl font-semibold tracking-tight">
+                  {expense ? "Edit expense" : "Add expense"}
+                </Text>
+              </View>
               <Text className="text-sm text-muted-foreground">
                 {group?.name ?? "Your group"}
                 {group ? ` · ${group.currency}` : ""}
@@ -466,14 +484,11 @@ export default function CreateExpenseScreen({
                   </View>
                 ) : null}
 
-                <FormField
+                <DateField
                   label="Expense date"
-                  icon="calendar-outline"
-                  placeholder="YYYY-MM-DD"
                   value={date}
-                  onChangeText={setDate}
-                  editable={!saving}
-                  autoCapitalize="none"
+                  onChange={setDate}
+                  disabled={saving}
                 />
 
                 <FormField

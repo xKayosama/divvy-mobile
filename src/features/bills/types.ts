@@ -10,6 +10,26 @@ export type BillCategory =
 
 export type BillStatus = "PENDING" | "PAID" | "OVERDUE";
 
+export type BillRecurrence = "WEEKLY" | "MONTHLY" | "YEARLY";
+
+export type CreateBillRequest = {
+  name: string;
+  amount: number;
+  category: BillCategory;
+  dueDate: string;
+  notes: string;
+} & (
+  | { isRecurring: false; recurrence?: null }
+  | { isRecurring: true; recurrence: BillRecurrence }
+);
+
+export type BillResponse = {
+  code: number;
+  success: true;
+  message: string;
+  data: { bill: Bill };
+};
+
 export type Bill = {
   _id: string;
   groupId: string;
@@ -20,7 +40,7 @@ export type Bill = {
   status: BillStatus;
   notes: string;
   isRecurring: boolean;
-  recurrence: "MONTHLY" | "WEEKLY" | "YEARLY" | null;
+  recurrence: BillRecurrence | null;
   paidBy: {
     _id: string;
     firstName: string;
