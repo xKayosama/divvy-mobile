@@ -1,3 +1,4 @@
+import type { TextInput } from "react-native";
 import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import DateField from "@/components/ui/date-field";
@@ -8,9 +9,10 @@ import { useTheme } from "@/theme/ThemeProvider";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Keyboard,
+  KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { billCategories, validateBillForm } from "../billForm";
+import { billCategories, validateBillFields } from "../billForm";
 import { useCreateBillMutation, useUpdateBillMutation } from "../billsApi";
 import type {
   Bill,
@@ -38,7 +40,14 @@ export default function CreateBillScreen({
   );
   const [notes, setNotes] = useState(bill?.notes ?? "");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const submitting = useRef(false);
+  const amountInput = useRef<TextInput>(null);
   const [createBill, { isLoading: creating }] = useCreateBillMutation();
   const [updateBill, { isLoading: updating }] = useUpdateBillMutation();
   const saving = creating || updating;
@@ -55,9 +64,15 @@ export default function CreateBillScreen({
     if (submitting.current) return;
     const normalizedAmount = amount.trim().replace(",", ".");
     const normalizedDate = dueDate.trim();
-    const error = validateBillForm(name, normalizedAmount, normalizedDate);
-    setMessage(error);
-    if (error) return;
+    const errors = validateBillFields(name, normalizedAmount, normalizedDate);
+    setFieldErrors({});
+    setMessage("");
+    const firstError = Object.entries(errors)[0];
+    if (firstError) {
+      fieldError(firstError[0], firstError[1]);
+      return;
+    }
+    Keyboard.dismiss();
     submitting.current = true;
     try {
       if (bill?.status === "PAID") {
@@ -95,6 +110,7 @@ export default function CreateBillScreen({
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ padding: 20, gap: 24 }}
         >
           <View className="gap-2">
@@ -127,8 +143,12 @@ export default function CreateBillScreen({
               label="Bill name"
               icon="document-text-outline"
               placeholder="e.g. Electricity bill"
-              value={name}
-              onChangeText={setName}
+              returnKeyType="next"
+                    submitBehavior="submit"
+                    onSubmitEditing={() => amountInput.current?.focus()}
+                    value={name}
+              error={fieldErrors.name}
+              onChangeText={value => { setName(value); setFieldErrors({}); setMessage(""); }}
               editable={!saving}
             />
             <FormField
@@ -136,14 +156,17 @@ export default function CreateBillScreen({
               icon="cash-outline"
               placeholder="0.00"
               keyboardType="decimal-pad"
-              value={amount}
-              onChangeText={setAmount}
+              inputRef={amountInput}
+                    value={amount}
+              error={fieldErrors.amount}
+              onChangeText={value => { setAmount(value); setFieldErrors({}); setMessage(""); }}
               editable={!saving}
             />
             <DateField
               label="Due date"
               value={dueDate}
-              onChange={setDueDate}
+              error={fieldErrors.dueDate}
+              onChange={value => { setDueDate(value); setFieldErrors({}); setMessage(""); }}
               disabled={saving}
             />
           </View>

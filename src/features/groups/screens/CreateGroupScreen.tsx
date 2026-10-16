@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { FormField, FormMessage } from "@/components/auth/FormField";
+import { authError } from "@/features/auth/errors";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useCreateGroupMutation } from "../groupsApi";
@@ -11,6 +12,12 @@ import { useCreateGroupMutation } from "../groupsApi";
 export default function CreateGroupScreen() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const [createGroup, { isLoading }] = useCreateGroupMutation();
   const submitting = useRef(false);
 
@@ -20,18 +27,19 @@ export default function CreateGroupScreen() {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      setMessage("Enter a group name.");
+      fieldError("name", "Enter a group name.");
       return;
     }
 
+    Keyboard.dismiss();
     submitting.current = true;
     setMessage("");
 
     try {
       await createGroup({ name: trimmedName }).unwrap();
       router.replace("/groups");
-    } catch {
-      setMessage("Could not create the group. Please try again.");
+    } catch (error) {
+      setMessage(authError(error, "Could not create the group. Please try again."));
     } finally {
       submitting.current = false;
     }
@@ -39,8 +47,10 @@ export default function CreateGroupScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{ padding: 24, flexGrow: 1 }}
       >
         <Text className="mb-2 text-2xl font-semibold">
@@ -57,8 +67,10 @@ export default function CreateGroupScreen() {
             icon="people-outline"
             placeholder="Our home"
             value={name}
+            error={fieldErrors.name}
             onChangeText={(value) => {
               setName(value);
+              setFieldErrors({});
               setMessage("");
             }}
             editable={!isLoading}
@@ -92,6 +104,7 @@ export default function CreateGroupScreen() {
           </Button>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

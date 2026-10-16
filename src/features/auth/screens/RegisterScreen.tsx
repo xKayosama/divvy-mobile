@@ -1,7 +1,7 @@
 import { useTheme } from "@/theme/ThemeProvider";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
-import { View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { AuthScreen, AuthHeading } from "@/components/auth/AuthScreen";
 import { FormField, FormMessage } from "@/components/auth/FormField";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -18,27 +18,21 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState(false);
   const [register, { isLoading }] = useRegisterMutation();
   const submitting = useRef(false);
   async function handleRegister() {
     if (submitting.current || created) return;
     setMessage("");
-    if (
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
-      !password
-    ) {
-      setMessage(
-        "Enter your first name, last name, a valid email address, and password.",
-      );
+    setFieldErrors({});
+    const field = !firstName.trim() ? "firstName" : !lastName.trim() ? "lastName" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? "email" : !password ? "password" : password !== confirmation ? "confirmation" : undefined;
+    if (field) {
+      const errors = { firstName: "Enter your first name.", lastName: "Enter your last name.", email: "Enter a valid email address.", password: "Enter a password.", confirmation: "Your passwords do not match." };
+      setFieldErrors({ [field]: errors[field] });
       return;
     }
-    if (password !== confirmation) {
-      setMessage("Your passwords do not match.");
-      return;
-    }
+    Keyboard.dismiss();
     submitting.current = true;
     try {
       await register({
@@ -99,8 +93,9 @@ export default function RegisterScreen() {
           placeholder="First name"
           autoComplete="given-name"
           autoCapitalize="words"
+          error={fieldErrors.firstName}
           value={firstName}
-          onChangeText={setFirstName}
+          onChangeText={value => { setFirstName(value); setFieldErrors({}); setMessage(""); }}
           editable={!isLoading}
         />
         <FormField
@@ -109,8 +104,9 @@ export default function RegisterScreen() {
           placeholder="Last name"
           autoComplete="family-name"
           autoCapitalize="words"
+          error={fieldErrors.lastName}
           value={lastName}
-          onChangeText={setLastName}
+          onChangeText={value => { setLastName(value); setFieldErrors({}); setMessage(""); }}
           editable={!isLoading}
         />
         <FormField
@@ -121,8 +117,9 @@ export default function RegisterScreen() {
           autoComplete="email"
           autoCapitalize="none"
           autoCorrect={false}
+          error={fieldErrors.email}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={value => { setEmail(value); setFieldErrors({}); setMessage(""); }}
           editable={!isLoading}
         />
         <FormField
@@ -133,8 +130,9 @@ export default function RegisterScreen() {
           autoComplete="new-password"
           autoCapitalize="none"
           autoCorrect={false}
+          error={fieldErrors.password}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={value => { setPassword(value); setFieldErrors({}); setMessage(""); }}
           editable={!isLoading}
         />
         <FormField
@@ -145,8 +143,9 @@ export default function RegisterScreen() {
           autoComplete="new-password"
           autoCapitalize="none"
           autoCorrect={false}
+          error={fieldErrors.confirmation}
           value={confirmation}
-          onChangeText={setConfirmation}
+          onChangeText={value => { setConfirmation(value); setFieldErrors({}); setMessage(""); }}
           editable={!isLoading}
           returnKeyType="go"
           onSubmitEditing={handleRegister}

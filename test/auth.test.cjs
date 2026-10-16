@@ -1520,3 +1520,14 @@ for (const [name, endpoint, values, filters] of [
     assert.equal(reads, 8);
   });
 }
+
+test("bill field validation identifies each invalid field and rejects unsafe amounts", () => {
+  const { validateBillFields } = require("../src/features/bills/billForm.ts");
+  assert.deepEqual(validateBillFields(" ", "0", "2026-02-30"), {
+    name: "Enter a bill name.",
+    amount: "Enter an amount greater than zero, with up to two decimals.",
+    dueDate: "Enter a valid due date in YYYY-MM-DD format.",
+  });
+  assert.ok(validateBillFields("Rent", "9007199254740991", "2026-10-16").amount);
+  assert.deepEqual(validateBillFields("Rent", "12.50", "2028-02-29"), {});
+});

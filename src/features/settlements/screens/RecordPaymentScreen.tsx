@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -73,6 +74,12 @@ export default function RecordPaymentScreen({
   const [amount, setAmount] = useState(initialAmount);
   const [date, setDate] = useState(() => localCalendarDate());
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const [review, setReview] = useState<RecordPaymentRequest | null>(null);
   const [receipt, setReceipt] = useState<{
     recipient: string;
@@ -103,7 +110,7 @@ export default function RecordPaymentScreen({
     const normalized = amount.trim().replace(",", ".");
     const error = validatePayment(normalized, date);
     if (error) {
-      setMessage(error);
+      fieldError(error.includes("amount") ? "amount" : "date", error);
       return;
     }
     const remaining =
@@ -117,6 +124,7 @@ export default function RecordPaymentScreen({
       );
       return;
     }
+    Keyboard.dismiss();
     setReview({
       requestId: createPaymentRequestId(),
       to,
@@ -132,6 +140,7 @@ export default function RecordPaymentScreen({
       setMessage(error);
       return;
     }
+    Keyboard.dismiss();
     submitting.current = true;
     setMessage("");
     try {
@@ -174,6 +183,7 @@ export default function RecordPaymentScreen({
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ padding: 20, gap: 24, flexGrow: 1 }}
         >
           {receipt ? (
@@ -319,12 +329,14 @@ export default function RecordPaymentScreen({
                     keyboardType="decimal-pad"
                     placeholder="0.00"
                     value={amount}
-                    onChangeText={setAmount}
+              error={fieldErrors.amount}
+                    onChangeText={value => { setAmount(value); setFieldErrors({}); setMessage(""); }}
                   />
                   <DateField
                     label="Payment date"
                     value={date}
-                    onChange={setDate}
+              error={fieldErrors.date}
+                    onChange={value => { setDate(value); setFieldErrors({}); setMessage(""); }}
                   />
                   <FormMessage message={message} />
                   <Button

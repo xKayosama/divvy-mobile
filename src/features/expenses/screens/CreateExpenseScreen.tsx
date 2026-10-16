@@ -1,9 +1,11 @@
+import type { TextInput } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -82,7 +84,14 @@ export default function CreateExpenseScreen({
   });
   const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const submitting = useRef(false);
+  const amountInput = useRef<TextInput>(null);
 
   const { data: groupsData } = useGetMyGroupsQuery();
   const group = groupsData?.data.groups.find((item) => item.id === groupId);
@@ -108,6 +117,7 @@ export default function CreateExpenseScreen({
 
   function toggleParticipant(id: string) {
     setMessage("");
+    setFieldErrors({});
     setParticipantIds((current) =>
       current.includes(id)
         ? current.filter((value) => value !== id)
@@ -126,6 +136,7 @@ export default function CreateExpenseScreen({
     if (submitting.current) return;
 
     setMessage("");
+    setFieldErrors({});
     if (receipt && (!group || !receiptReviewed)) {
       setMessage(
         "Review the extracted details and confirm the amount is in your group currency before saving.",
@@ -137,21 +148,22 @@ export default function CreateExpenseScreen({
     const numericAmount = Number(normalizedAmount);
 
     if (!description.trim()) {
-      setMessage("Enter a description.");
+      fieldError("description", "Enter a description.");
       return;
     }
 
     if (
       !/^\d+(\.\d{1,2})?$/.test(normalizedAmount) ||
       !Number.isFinite(numericAmount) ||
-      numericAmount <= 0
+      numericAmount <= 0 ||
+      !Number.isSafeInteger(Math.round(numericAmount * 100))
     ) {
-      setMessage("Enter an amount greater than zero, with up to two decimals.");
+      fieldError("amount", "Enter an amount greater than zero, with up to two decimals.");
       return;
     }
 
     if (!members.some((member) => member._id === paidBy)) {
-      setMessage("Choose who paid.");
+      fieldError("paidBy", "Choose who paid.");
       return;
     }
 
@@ -159,7 +171,7 @@ export default function CreateExpenseScreen({
       participantIds.length === 0 ||
       participantIds.some((id) => !members.some((member) => member._id === id))
     ) {
-      setMessage(
+      fieldError("participants",
         "Choose at least one active participant and remove unavailable members.",
       );
       return;
@@ -174,7 +186,7 @@ export default function CreateExpenseScreen({
       expenseDate.getMonth() + 1 !== Number(normalizedDate.slice(5, 7)) ||
       expenseDate.getDate() !== Number(normalizedDate.slice(8, 10))
     ) {
-      setMessage("Enter a valid date in YYYY-MM-DD format.");
+      fieldError("date", "Enter a valid date in YYYY-MM-DD format.");
       return;
     }
 
@@ -206,7 +218,7 @@ export default function CreateExpenseScreen({
             !/^\d+(\.\d{1,2})?$/.test(value) || !Number.isFinite(Number(value)),
         )
       ) {
-        setMessage(
+        fieldError("shares",
           "Enter a nonnegative share for every selected member, with up to two decimals.",
         );
         return;
@@ -217,7 +229,7 @@ export default function CreateExpenseScreen({
       );
       if (splitType === "EXACT") {
         if (total !== Math.round(numericAmount * 100)) {
-          setMessage("Member amounts must add up to the expense amount.");
+          fieldError("shares", "Member amounts must add up to the expense amount.");
           return;
         }
         body = {
@@ -230,7 +242,7 @@ export default function CreateExpenseScreen({
         };
       } else {
         if (values.some((value) => Number(value) > 100) || total !== 10000) {
-          setMessage(
+          fieldError("shares",
             "Member percentages must be between 0 and 100 and total 100%.",
           );
           return;
@@ -246,6 +258,7 @@ export default function CreateExpenseScreen({
       }
     }
 
+    Keyboard.dismiss();
     submitting.current = true;
 
     try {
@@ -271,6 +284,7 @@ export default function CreateExpenseScreen({
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: 20, paddingBottom: 32 }}
         >
@@ -426,8 +440,12 @@ export default function CreateExpenseScreen({
                     label="Description"
                     icon="receipt-outline"
                     placeholder="Weekly groceries"
+                    returnKeyType="next"
+                    submitBehavior="submit"
+                    onSubmitEditing={() => amountInput.current?.focus()}
                     value={description}
-                    onChangeText={setDescription}
+              error={fieldErrors.description}
+                    onChangeText={value => { setDescription(value); setFieldErrors({}); setMessage(""); }}
                     editable={!saving}
                   />
 
@@ -436,8 +454,10 @@ export default function CreateExpenseScreen({
                     icon="cash-outline"
                     placeholder="0.00"
                     keyboardType="decimal-pad"
+                    inputRef={amountInput}
                     value={amount}
-                    onChangeText={setAmount}
+              error={fieldErrors.amount}
+                    onChangeText={value => { setAmount(value); setFieldErrors({}); setMessage(""); }}
                     editable={!saving}
                   />
                 </View>
@@ -474,6 +494,7 @@ export default function CreateExpenseScreen({
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Paid by</Text>
+                  <FormMessage message={fieldErrors.paidBy ?? ""} />
                   {expense &&
                   !members.some((member) => member._id === paidBy) ? (
                     <Text className="text-sm text-muted-foreground">
@@ -488,7 +509,7 @@ export default function CreateExpenseScreen({
                       className="min-h-12 h-auto rounded-2xl py-3"
                       disabled={saving}
                       accessibilityState={{ selected: paidBy === member._id }}
-                      onPress={() => setPaidBy(member._id)}
+                      onPress={() => { setPaidBy(member._id); setFieldErrors({}); setMessage(""); }}
                     >
                       <Text>
                         {member.firstName} {member.lastName}
@@ -499,6 +520,7 @@ export default function CreateExpenseScreen({
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Split between</Text>
+                  <FormMessage message={fieldErrors.participants ?? fieldErrors.shares ?? ""} />
                   <View className="flex-row flex-wrap gap-2">
                     {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
                       (value) => (
@@ -598,12 +620,11 @@ export default function CreateExpenseScreen({
                           placeholder="0.00"
                           value={shares[id] ?? ""}
                           editable={!saving}
-                          onChangeText={(value) =>
-                            setShares((current) => ({
-                              ...current,
-                              [id]: value,
-                            }))
-                          }
+                          onChangeText={(value) => {
+                            setFieldErrors({});
+                            setMessage("");
+                            setShares(current => ({ ...current, [id]: value }));
+                          }}
                         />
                       );
                     })}
@@ -613,7 +634,8 @@ export default function CreateExpenseScreen({
                 <DateField
                   label="Expense date"
                   value={date}
-                  onChange={setDate}
+              error={fieldErrors.date}
+                  onChange={value => { setDate(value); setFieldErrors({}); setMessage(""); }}
                   disabled={saving}
                 />
 

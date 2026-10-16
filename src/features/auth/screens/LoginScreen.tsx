@@ -1,7 +1,7 @@
 import { useTheme } from "@/theme/ThemeProvider";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
-import { View } from "react-native";
+import { Keyboard, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -19,6 +19,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [login, { isLoading }] = useLoginMutation();
   const [saving, setSaving] = useState(false);
   const busy = isLoading || saving;
@@ -27,15 +28,18 @@ export default function LoginScreen() {
   async function handleLogin() {
     if (submitting.current) return;
     setMessage("");
+    setFieldErrors({});
     const trimmedEmail = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) || !password) {
-      setMessage("Enter a valid email address and your password.");
+    const field = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) ? "email" : !password ? "password" : undefined;
+    if (field) {
+      setFieldErrors({ [field]: field === "email" ? "Enter a valid email address." : "Enter your password." });
       return;
     }
     if (!process.env.EXPO_PUBLIC_API_URL?.trim()) {
       setMessage("The API URL is missing. Configure it and restart the app.");
       return;
     }
+    Keyboard.dismiss();
     submitting.current = true;
     try {
       const response = await login({ email: trimmedEmail, password }).unwrap();
@@ -67,9 +71,11 @@ export default function LoginScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="email"
+          error={fieldErrors.email}
           value={email}
           onChangeText={(value) => {
             setEmail(value);
+            setFieldErrors({});
             setMessage("");
           }}
           editable={!busy}
@@ -82,9 +88,11 @@ export default function LoginScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="current-password"
+          error={fieldErrors.password}
           value={password}
           onChangeText={(value) => {
             setPassword(value);
+            setFieldErrors({});
             setMessage("");
           }}
           editable={!busy}

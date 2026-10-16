@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -35,6 +36,12 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
   );
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const [added, setAdded] = useState<
     AddGroupMemberResponse["data"]["member"] | null
   >(null);
@@ -50,9 +57,10 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
     if (submitting.current || !isOwner || isError || isFetching) return;
     const normalized = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      setMessage("Enter a valid email address.");
+      fieldError("email", "Enter a valid email address.");
       return;
     }
+    Keyboard.dismiss();
     submitting.current = true;
     setMessage("");
     try {
@@ -72,6 +80,7 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ padding: 20, gap: 24, flexGrow: 1 }}
         >
           {!added ? (
@@ -234,13 +243,16 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
               <View className="gap-4 rounded-[24px] bg-card p-5">
                 <FormField
                   label="Email address"
+                    returnKeyType="done"
+                    onSubmitEditing={() => void submit()}
                   icon="mail-outline"
                   placeholder="name@example.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                   value={email}
-                  onChangeText={setEmail}
+              error={fieldErrors.email}
+                  onChangeText={value => { setEmail(value); setFieldErrors({}); setMessage(""); }}
                   editable={!saving}
                 />
                 <FormMessage message={message} />

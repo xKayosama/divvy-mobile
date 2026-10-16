@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -62,6 +63,12 @@ export default function ManageGroupScreen({
       : undefined;
   const [name, setName] = useState<string | undefined>();
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  function fieldError(field: string, text: string) {
+    setFieldErrors({ [field]: text });
+    setMessage("Check the highlighted field and try again.");
+  }
+
   const [done, setDone] = useState(false);
   const submitting = useRef(false);
   const [removeMember, { isLoading: removing }] =
@@ -79,9 +86,10 @@ export default function ManageGroupScreen({
     if (memberUserId && (!target || !canRemove)) return;
     const nextName = (name ?? group.name).trim();
     if (!memberUserId && !nextName) {
-      setMessage("Enter a group name.");
+      fieldError("name", "Enter a group name.");
       return;
     }
+    Keyboard.dismiss();
     submitting.current = true;
     setMessage("");
     try {
@@ -112,6 +120,7 @@ export default function ManageGroupScreen({
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ padding: 20, gap: 24, flexGrow: 1 }}
         >
           {!done ? (
@@ -300,9 +309,12 @@ export default function ManageGroupScreen({
                 <View className="gap-4 rounded-[24px] bg-card p-5">
                   <FormField
                     label="Group name"
+                    returnKeyType="done"
+                    onSubmitEditing={() => void save()}
                     icon="people-outline"
                     value={name ?? group.name}
-                    onChangeText={setName}
+                    error={fieldErrors.name}
+                    onChangeText={value => { setName(value); setFieldErrors({}); setMessage(""); }}
                     editable={!saving}
                     autoCapitalize="words"
                   />
