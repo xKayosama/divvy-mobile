@@ -1465,3 +1465,29 @@ test("spending comparison labels handle direction, zero baselines, in-progress m
   assert.equal(spendingComparisonText(null), null);
   assert.equal(spendingComparisonText(undefined), null);
 });
+
+test("expense detail fetch preserves split shares and missing member references", async () => {
+  signedIn();
+  const expense = {
+    _id: "e1", groupId: "g1", description: "Dinner", amount: 60, category: "FOOD", date: "2026-10-16T00:00:00.000Z", notes: "Shared dinner",
+    paidBy: null, splitType: "PERCENTAGE",
+    participants: [{ userId: { _id: "u1", firstName: "Test", lastName: "User" }, amount: 30, percentage: 50 }, { userId: null, amount: 30, percentage: 50 }],
+  };
+  global.fetch = async request => {
+    assert.equal(request.url, "https://divvy.test/api/expenses/e1");
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    return respond(200, { success: true, data: { expense } });
+  };
+  const result = await store.dispatch(expensesApi.endpoints.getExpense.initiate("e1", { subscribe: false })).unwrap();
+  assert.deepEqual(result.data.expense, expense);
+});
+
+for (const status of [403, 404, 500]) {
+  test(`expense detail ${status} surfaces a retryable error without clearing the session`, async () => {
+    signedIn();
+    global.fetch = async () => respond(status, { success: false, message: "Expense unavailable" });
+    await assert.rejects(store.dispatch(expensesApi.endpoints.getExpense.initiate("missing", { subscribe: false })).unwrap(), error => error.status === status);
+    assert.equal(store.getState().auth.token, "saved-token");
+    assert.equal(expensesApi.endpoints.getExpense.select("missing")(store.getState()).data, undefined);
+  });
+}

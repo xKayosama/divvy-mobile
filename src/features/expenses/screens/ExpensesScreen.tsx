@@ -12,10 +12,7 @@ import { tabContentBottomInset } from "@/constants/navigation";
 import { authError } from "@/features/auth/errors";
 import { useGetMyGroupsQuery } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
-import {
-  useDeleteExpenseMutation,
-  useGetGroupExpensesQuery,
-} from "../expensesApi";
+import { useGetGroupExpensesQuery } from "../expensesApi";
 
 import { categoryIcons } from "../categoryIcons";
 import ExpenseFiltersModal from "../components/ExpenseFiltersModal";
@@ -31,8 +28,6 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -67,8 +62,6 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
     const timer = setTimeout(() => {
       setSearch(searchText.trim());
       setPage(1);
-      setConfirmId(null);
-      setDeleteError("");
     }, 350);
     return () => clearTimeout(timer);
   }, [searchText, searchPending]);
@@ -77,8 +70,6 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
     setSearchText("");
     setSearch("");
     setPage(1);
-    setConfirmId(null);
-    setDeleteError("");
   }
 
   const [filters, setFilters] = useState<ExpenseFilters>(initialFilters);
@@ -92,29 +83,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
   function applyFilters(next: ExpenseFilters) {
     setFilters(next);
     setPage(1);
-    setConfirmId(null);
-    setDeleteError("");
     setShowFilters(false);
-  }
-
-  const [deleteExpense, { isLoading: deleting }] = useDeleteExpenseMutation();
-  const deletingRef = useRef(false);
-
-  async function handleDelete(expenseId: string) {
-    if (deletingRef.current) return;
-    deletingRef.current = true;
-    setDeleteError("");
-    try {
-      await deleteExpense({ groupId, expenseId }).unwrap();
-      setConfirmId(null);
-      setPage(1);
-    } catch (error) {
-      setDeleteError(
-        authError(error, "Could not delete the expense. Try again."),
-      );
-    } finally {
-      deletingRef.current = false;
-    }
   }
 
   const { data: groupsData } = useGetMyGroupsQuery();
@@ -172,7 +141,6 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
             className="h-12 w-12 rounded-2xl p-0"
             accessibilityLabel={hasFilters ? "Edit expense filters, filters active" : "Filter expenses"}
             accessibilityState={{ selected: hasFilters }}
-            disabled={deleting}
             onPress={() => setShowFilters(true)}
           >
             <Ionicons
@@ -252,8 +220,6 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
               onSubmitEditing={() => {
                 setSearch(searchText.trim());
                 setPage(1);
-                setConfirmId(null);
-                setDeleteError("");
               }}
             />
             {searchText ? (
@@ -369,149 +335,32 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
           }}
           ItemSeparatorComponent={() => <View className="h-3" />}
           renderItem={({ item }) => (
-            <View
-              className="gap-4 rounded-[24px] bg-card p-5"
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View expense details for ${item.description}`}
+              className="gap-3 rounded-[24px] bg-card p-4 active:opacity-70"
               style={surfaces.card}
+              onPress={() => router.push({ pathname: "/groups/[groupId]/expenses/[expenseId]", params: { groupId, expenseId: item._id } })}
             >
               <View className="flex-row items-center gap-3">
-                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-secondary">
-                  <Ionicons
-                    name={categoryIcons[item.category] ?? categoryIcons.OTHERS}
-                    size={21}
-                    color={colors.primary}
-                    accessible={false}
-                  />
+                <View className="h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                  <Ionicons name={categoryIcons[item.category] ?? categoryIcons.OTHERS} size={21} color={colors.primary} accessible={false} />
                 </View>
-
                 <View className="min-w-0 flex-1 gap-1">
-                  <Text className="font-semibold">{item.description}</Text>
-
-                  <Text className="text-xs text-muted-foreground">
-                    {item.category.toLowerCase()}
-                  </Text>
+                  <Text numberOfLines={2} className="font-semibold">{item.description}</Text>
+                  <Text className="text-xs capitalize text-muted-foreground">{item.category.toLowerCase()}</Text>
                 </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} accessible={false} />
               </View>
-
-              <View className="flex-row flex-wrap items-center justify-between gap-3">
-                <Text className="text-xl font-semibold">
-                  {group?.currency ? `${group.currency} ` : ""}
-                  {formatAmount(item.amount)}
-                </Text>
-
-                <View className="rounded-full bg-secondary px-3 py-1">
-                  <Text className="text-xs text-secondary-foreground">
-                    {splitLabels[item.splitType]}
-                  </Text>
-                </View>
+              <View className="flex-row flex-wrap items-center justify-between gap-2">
+                <Text className="text-xl font-semibold">{group?.currency ? `${group.currency} ` : ""}{formatAmount(item.amount)}</Text>
+                <Text className="text-xs text-muted-foreground">{splitLabels[item.splitType]}</Text>
               </View>
-
               <Text className="text-xs text-muted-foreground">
-                Paid by{" "}
-                {item.paidBy
-                  ? `${item.paidBy.firstName} ${item.paidBy.lastName}`
-                  : "Unknown member"}
-                {" · "}
-                {new Date(item.date).toLocaleDateString("en-PH", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
+                Paid by {item.paidBy ? `${item.paidBy.firstName} ${item.paidBy.lastName}` : "Unknown member"}
+                {" · "}{new Date(item.date).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}
               </Text>
-              <View className="gap-2 border-t border-border pt-3">
-                {item.participants.map((participant, index) => (
-                  <View
-                    key={participant.userId?._id ?? index}
-                    className="flex-row justify-between gap-3"
-                  >
-                    <Text className="flex-1 text-sm text-muted-foreground">
-                      {participant.userId
-                        ? `${participant.userId.firstName} ${participant.userId.lastName}`
-                        : "Former member"}
-                      {participant.percentage != null
-                        ? ` (${participant.percentage}%)`
-                        : ""}
-                    </Text>
-                    <Text className="text-sm">
-                      {formatAmount(participant.amount)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <View className="gap-3 border-t border-border pt-3">
-                {confirmId === item._id ? (
-                  <>
-                    <Text accessibilityLiveRegion="polite">
-                      Delete “{item.description}” (
-                      {group?.currency ? `${group.currency} ` : ""}
-                      {formatAmount(item.amount)})? This cannot be undone and
-                      will update group balances.
-                    </Text>
-                    {deleteError ? (
-                      <Text
-                        accessibilityLiveRegion="polite"
-                        className="text-destructive"
-                      >
-                        {deleteError}
-                      </Text>
-                    ) : null}
-                    <View className="flex-row flex-wrap gap-3">
-                      <Button
-                        variant="destructive"
-                        disabled={deleting}
-                        onPress={() => void handleDelete(item._id)}
-                      >
-                        <Text>{deleting ? "Deleting…" : "Confirm delete"}</Text>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        disabled={deleting}
-                        onPress={() => {
-                          setConfirmId(null);
-                          setDeleteError("");
-                        }}
-                      >
-                        <Text>Cancel</Text>
-                      </Button>
-                    </View>
-                  </>
-                ) : (
-                  <View className="flex-row gap-3">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      disabled={deleting}
-                      accessibilityLabel={`Edit ${item.description}`}
-                      onPress={() =>
-                        router.push({
-                          pathname:
-                            "/groups/[groupId]/expenses/[expenseId]/edit",
-                          params: { groupId, expenseId: item._id },
-                        })
-                      }
-                    >
-                      <Text>Edit</Text>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      disabled={deleting}
-                      accessibilityLabel={`Delete ${item.description}`}
-                      onPress={() => {
-                        setConfirmId(item._id);
-                        setDeleteError("");
-                      }}
-                    >
-                      <Text className="text-destructive">Delete</Text>
-                    </Button>
-                  </View>
-                )}
-              </View>
-              {item.notes ? (
-                <Text className="text-sm text-muted-foreground">
-                  {item.notes}
-                </Text>
-              ) : null}
-            </View>
+            </Pressable>
           )}
           ListFooterComponent={
             currentData && currentData.pagination.totalPages > 1 ? (
