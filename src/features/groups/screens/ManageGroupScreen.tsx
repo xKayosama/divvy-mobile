@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@/theme/ThemeProvider";
 import type { GroupMember } from "../types";
@@ -75,11 +76,13 @@ export default function ManageGroupScreen({
     useRemoveGroupMemberMutation();
   const [renameGroup, { isLoading: renaming }] = useRenameGroupMutation();
   const saving = removing || renaming;
+  const unsaved = useUnsavedChanges(!done && !memberUserId && name !== undefined && name !== group?.name, saving);
+
   function back() {
-    router.navigate({
+    unsaved.requestLeave(() => router.navigate({
       pathname: "/groups/[groupId]/group",
       params: { groupId },
-    });
+    }));
   }
   async function save() {
     if (submitting.current || fetching || error || !isOwner || !group) return;
@@ -348,6 +351,7 @@ export default function ManageGroupScreen({
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }

@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
@@ -83,6 +84,8 @@ export default function CreateExpenseScreen({
       : calendarDate(expense ? new Date(expense.date) : new Date());
   });
   const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
+  const snapshot = JSON.stringify({ description, amount, category, paidBy, participantIds, splitType, shares, date, notes, receiptReviewed });
+  const [initialSnapshot] = useState(snapshot);
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   function fieldError(field: string, text: string) {
@@ -125,7 +128,16 @@ export default function CreateExpenseScreen({
     );
   }
 
+  const unsaved = useUnsavedChanges(!!receipt || snapshot !== initialSnapshot, saving);
+
   function returnToExpenses() {
+    unsaved.requestLeave(() => router.navigate({
+      pathname: "/groups/[groupId]/expenses",
+      params: { groupId },
+    }));
+  }
+
+  function leaveSavedForm() {
     router.navigate({
       pathname: "/groups/[groupId]/expenses",
       params: { groupId },
@@ -268,7 +280,7 @@ export default function CreateExpenseScreen({
         await createExpense({ groupId, body }).unwrap();
       }
 
-      returnToExpenses();
+      unsaved.complete(leaveSavedForm);
     } catch (error) {
       setMessage(authError(error, "Could not save the expense."));
     } finally {
@@ -674,6 +686,7 @@ export default function CreateExpenseScreen({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }

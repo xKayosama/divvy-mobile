@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
@@ -73,6 +74,8 @@ export default function RecordPaymentScreen({
   const [to, setTo] = useState(initialTo);
   const [amount, setAmount] = useState(initialAmount);
   const [date, setDate] = useState(() => localCalendarDate());
+  const snapshot = JSON.stringify({ to, amount, date });
+  const [initialSnapshot] = useState(snapshot);
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   function fieldError(field: string, text: string) {
@@ -91,11 +94,13 @@ export default function RecordPaymentScreen({
   const selected = members.find((member) => member._id === to);
   const format = (value: number) =>
     `${group?.currency ? `${group.currency} ` : ""}${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const unsaved = useUnsavedChanges(!receipt && (snapshot !== initialSnapshot || !!review || !!initialAmount), saving);
+
   function back() {
-    router.navigate({
+    unsaved.requestLeave(() => router.navigate({
       pathname: "/groups/[groupId]/settlements",
       params: { groupId },
-    });
+    }));
   }
   function prepare() {
     setMessage("");
@@ -354,6 +359,7 @@ export default function RecordPaymentScreen({
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }

@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
@@ -21,6 +22,8 @@ export default function CreateGroupScreen() {
   const [createGroup, { isLoading }] = useCreateGroupMutation();
   const submitting = useRef(false);
 
+  const unsaved = useUnsavedChanges(!!name.trim(), isLoading);
+
   async function handleCreate() {
     if (submitting.current) return;
 
@@ -37,7 +40,7 @@ export default function CreateGroupScreen() {
 
     try {
       await createGroup({ name: trimmedName }).unwrap();
-      router.replace("/groups");
+      unsaved.complete(() => router.replace("/groups"));
     } catch (error) {
       setMessage(authError(error, "Could not create the group. Please try again."));
     } finally {
@@ -98,13 +101,14 @@ export default function CreateGroupScreen() {
           <Button
             variant="ghost"
             disabled={isLoading}
-            onPress={() => router.replace("/groups")}
+            onPress={() => unsaved.requestLeave(() => router.replace("/groups"))}
           >
             <Text>Cancel</Text>
           </Button>
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }

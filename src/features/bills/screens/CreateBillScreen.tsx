@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
 import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ export default function CreateBillScreen({
     bill?.isRecurring ? bill.recurrence : null,
   );
   const [notes, setNotes] = useState(bill?.notes ?? "");
+  const snapshot = JSON.stringify({ name, amount, dueDate, category, recurrence, notes });
+  const [initialSnapshot] = useState(snapshot);
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   function fieldError(field: string, text: string) {
@@ -53,7 +56,16 @@ export default function CreateBillScreen({
   const saving = creating || updating;
   const { data } = useGetMyGroupsQuery();
   const group = data?.data.groups.find((item) => item.id === groupId);
+  const unsaved = useUnsavedChanges(snapshot !== initialSnapshot, saving);
+
   function back() {
+    unsaved.requestLeave(() => router.navigate({
+      pathname: "/groups/[groupId]/bills",
+      params: { groupId },
+    }));
+  }
+
+  function leaveSavedForm() {
     router.navigate({
       pathname: "/groups/[groupId]/bills",
       params: { groupId },
@@ -94,7 +106,7 @@ export default function CreateBillScreen({
       };
       if (bill) await updateBill({ groupId, billId: bill._id, body }).unwrap();
       else await createBill({ groupId, body }).unwrap();
-      back();
+      unsaved.complete(leaveSavedForm);
     } catch (error) {
       setMessage(authError(error, "Could not save the bill. Try again."));
     } finally {
@@ -295,6 +307,7 @@ export default function CreateBillScreen({
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }

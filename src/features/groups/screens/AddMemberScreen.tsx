@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
@@ -47,11 +48,13 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
   >(null);
   const submitting = useRef(false);
   const [addMember, { isLoading: saving }] = useAddGroupMemberMutation();
+  const unsaved = useUnsavedChanges(!added && !!email.trim(), saving);
+
   function back() {
-    router.navigate({
+    unsaved.requestLeave(() => router.navigate({
       pathname: "/groups/[groupId]/group",
       params: { groupId },
-    });
+    }));
   }
   async function submit() {
     if (submitting.current || !isOwner || isError || isFetching) return;
@@ -272,6 +275,7 @@ export default function AddMemberScreen({ groupId }: { groupId: string }) {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {unsaved.dialog}
     </SafeAreaView>
   );
 }
