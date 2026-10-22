@@ -1,11 +1,16 @@
 import { CategorySelector } from "@/components/ui/category-selector";
-import { currencyScale, validAmount, formatCurrencyAmount, amountPrecisionLabel } from "@/features/groups/money";
+import {
+  amountPrecisionLabel,
+  currencyScale,
+  formatCurrencyAmount,
+  validAmount,
+} from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
-import type { TextInput } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
+import type { TextInput } from "react-native";
 import {
   ActivityIndicator,
   Keyboard,
@@ -20,21 +25,21 @@ import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import DateField from "@/components/ui/date-field";
 import { Text } from "@/components/ui/text";
-import type { ReceiptExtraction } from "@/features/receipts/types";
-import { receiptDraft } from "@/features/receipts/receiptDraft";
 import { authError } from "@/features/auth/errors";
 import {
   useGetGroupMembersQuery,
   useGetMyGroupsQuery,
 } from "@/features/groups/groupsApi";
-import { useTheme } from "@/theme/ThemeProvider";
+import { receiptDraft } from "@/features/receipts/receiptDraft";
+import type { ReceiptExtraction } from "@/features/receipts/types";
 import { useAppSelector } from "@/hooks/redux";
-import { splitPreview } from "../splitPreview";
+import { useTheme } from "@/theme/ThemeProvider";
 import { expenseCategoryOptions } from "../categoryIcons";
 import {
   useCreateExpenseMutation,
   useUpdateExpenseMutation,
 } from "../expensesApi";
+import { splitPreview } from "../splitPreview";
 import type { CreateExpenseRequest, Expense, ExpenseCategory } from "../types";
 
 function calendarDate(value: Date) {
@@ -53,7 +58,7 @@ export default function CreateExpenseScreen({
   receiptImageUri?: string;
 }) {
   const { colors } = useTheme();
-  const currentUserId = useAppSelector(state => state.auth.user?.id);
+  const currentUserId = useAppSelector((state) => state.auth.user?.id);
   const draft = receipt ? receiptDraft(receipt) : undefined;
   const [receiptReviewed, setReceiptReviewed] = useState(false);
   const [description, setDescription] = useState(
@@ -65,7 +70,9 @@ export default function CreateExpenseScreen({
   const [category, setCategory] = useState<ExpenseCategory>(
     expense?.category ?? "OTHERS",
   );
-  const [paidBy, setPaidBy] = useState(expense ? (expense.paidBy?._id ?? "") : (currentUserId ?? ""));
+  const [paidBy, setPaidBy] = useState(
+    expense ? (expense.paidBy?._id ?? "") : (currentUserId ?? ""),
+  );
   const [participantIds, setParticipantIds] = useState<string[]>(
     expense?.participants.map((p, i) => p.userId?._id ?? `missing:${i}`) ?? [],
   );
@@ -88,7 +95,18 @@ export default function CreateExpenseScreen({
       : calendarDate(expense ? new Date(expense.date) : new Date());
   });
   const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
-  const snapshot = JSON.stringify({ description, amount, category, paidBy, participantIds, splitType, shares, date, notes, receiptReviewed });
+  const snapshot = JSON.stringify({
+    description,
+    amount,
+    category,
+    paidBy,
+    participantIds,
+    splitType,
+    shares,
+    date,
+    notes,
+    receiptReviewed,
+  });
   const [initialSnapshot] = useState(snapshot);
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -121,10 +139,20 @@ export default function CreateExpenseScreen({
   const unavailableIds = participantIds.filter(
     (id) => !members.some((member) => member._id === id),
   );
-  const preview = splitPreview(amount, splitType, participantIds, shares, group?.currency);
+  const preview = splitPreview(
+    amount,
+    splitType,
+    participantIds,
+    shares,
+    group?.currency,
+  );
   const scale = currencyScale(group?.currency);
-  const formatShare = (value: number) => `${group?.currency ?? ""} ${formatCurrencyAmount(value / scale, group?.currency)}`.trim();
-  const everyoneSelected = members.length > 0 && members.every(member => participantIds.includes(member._id)) && unavailableIds.length === 0;
+  const formatShare = (value: number) =>
+    `${group?.currency ?? ""} ${formatCurrencyAmount(value / scale, group?.currency)}`.trim();
+  const everyoneSelected =
+    members.length > 0 &&
+    members.every((member) => participantIds.includes(member._id)) &&
+    unavailableIds.length === 0;
 
   function toggleParticipant(id: string) {
     setMessage("");
@@ -136,13 +164,18 @@ export default function CreateExpenseScreen({
     );
   }
 
-  const unsaved = useUnsavedChanges(!!receipt || snapshot !== initialSnapshot, saving);
+  const unsaved = useUnsavedChanges(
+    !!receipt || snapshot !== initialSnapshot,
+    saving,
+  );
 
   function returnToExpenses() {
-    unsaved.requestLeave(() => router.navigate({
-      pathname: "/groups/[groupId]/expenses",
-      params: { groupId },
-    }));
+    unsaved.requestLeave(() =>
+      router.navigate({
+        pathname: "/groups/[groupId]/expenses",
+        params: { groupId },
+      }),
+    );
   }
 
   function leaveSavedForm() {
@@ -177,7 +210,10 @@ export default function CreateExpenseScreen({
       return;
     }
     if (!validAmount(normalizedAmount, group.currency)) {
-      fieldError("amount", `Enter an amount greater than zero, with ${amountPrecisionLabel(group.currency)}.`);
+      fieldError(
+        "amount",
+        `Enter an amount greater than zero, with ${amountPrecisionLabel(group.currency)}.`,
+      );
       return;
     }
 
@@ -190,7 +226,8 @@ export default function CreateExpenseScreen({
       participantIds.length === 0 ||
       participantIds.some((id) => !members.some((member) => member._id === id))
     ) {
-      fieldError("participants",
+      fieldError(
+        "participants",
         "Choose at least one active participant and remove unavailable members.",
       );
       return;
@@ -234,21 +271,33 @@ export default function CreateExpenseScreen({
       if (
         values.some(
           (value) =>
-            !validAmount(value, splitType === "PERCENTAGE" ? "PHP" : group.currency, true),
+            !validAmount(
+              value,
+              splitType === "PERCENTAGE" ? "PHP" : group.currency,
+              true,
+            ),
         )
       ) {
-        fieldError("shares",
+        fieldError(
+          "shares",
           `Enter a nonnegative share for every selected member, with ${splitType === "PERCENTAGE" ? "up to 2 decimal places" : amountPrecisionLabel(group.currency)}.`,
         );
         return;
       }
       const total = values.reduce(
-        (sum, value) => sum + Math.round(Number(value) * (splitType === "PERCENTAGE" ? 100 : scale)),
+        (sum, value) =>
+          sum +
+          Math.round(
+            Number(value) * (splitType === "PERCENTAGE" ? 100 : scale),
+          ),
         0,
       );
       if (splitType === "EXACT") {
         if (total !== Math.round(numericAmount * scale)) {
-          fieldError("shares", "Member amounts must add up to the expense amount.");
+          fieldError(
+            "shares",
+            "Member amounts must add up to the expense amount.",
+          );
           return;
         }
         body = {
@@ -261,7 +310,8 @@ export default function CreateExpenseScreen({
         };
       } else {
         if (values.some((value) => Number(value) > 100) || total !== 10000) {
-          fieldError("shares",
+          fieldError(
+            "shares",
             "Member percentages must be between 0 and 100 and total 100%.",
           );
           return;
@@ -397,7 +447,12 @@ export default function CreateExpenseScreen({
                           {item.description ?? "Unidentified item"}
                         </Text>
                         <Text className="text-xs text-muted-foreground">
-                          {item.total != null ? formatCurrencyAmount(item.total, receipt.currency ?? group?.currency) : "—"}
+                          {item.total != null
+                            ? formatCurrencyAmount(
+                                item.total,
+                                receipt.currency ?? group?.currency,
+                              )
+                            : "—"}
                         </Text>
                       </View>
                     ))}
@@ -458,13 +513,17 @@ export default function CreateExpenseScreen({
                   <FormField
                     label="Description"
                     icon="receipt-outline"
-                    placeholder="Weekly groceries"
+                    placeholder="e.g. Weekly groceries"
                     returnKeyType="next"
                     submitBehavior="submit"
                     onSubmitEditing={() => amountInput.current?.focus()}
                     value={description}
-              error={fieldErrors.description}
-                    onChangeText={value => { setDescription(value); setFieldErrors({}); setMessage(""); }}
+                    error={fieldErrors.description}
+                    onChangeText={(value) => {
+                      setDescription(value);
+                      setFieldErrors({});
+                      setMessage("");
+                    }}
                     editable={!saving}
                   />
 
@@ -475,13 +534,22 @@ export default function CreateExpenseScreen({
                     keyboardType="decimal-pad"
                     inputRef={amountInput}
                     value={amount}
-              error={fieldErrors.amount}
-                    onChangeText={value => { setAmount(value); setFieldErrors({}); setMessage(""); }}
+                    error={fieldErrors.amount}
+                    onChangeText={(value) => {
+                      setAmount(value);
+                      setFieldErrors({});
+                      setMessage("");
+                    }}
                     editable={!saving}
                   />
                 </View>
 
-                <CategorySelector value={category} options={expenseCategoryOptions} onChange={setCategory} disabled={saving} />
+                <CategorySelector
+                  value={category}
+                  options={expenseCategoryOptions}
+                  onChange={setCategory}
+                  disabled={saving}
+                />
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Paid by</Text>
@@ -500,7 +568,11 @@ export default function CreateExpenseScreen({
                       className="min-h-12 h-auto rounded-2xl py-3"
                       disabled={saving}
                       accessibilityState={{ selected: paidBy === member._id }}
-                      onPress={() => { setPaidBy(member._id); setFieldErrors({}); setMessage(""); }}
+                      onPress={() => {
+                        setPaidBy(member._id);
+                        setFieldErrors({});
+                        setMessage("");
+                      }}
                     >
                       <Text>
                         {member.firstName} {member.lastName}
@@ -511,7 +583,11 @@ export default function CreateExpenseScreen({
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Split between</Text>
-                  <FormMessage message={fieldErrors.participants ?? fieldErrors.shares ?? ""} />
+                  <FormMessage
+                    message={
+                      fieldErrors.participants ?? fieldErrors.shares ?? ""
+                    }
+                  />
                   <View className="flex-row flex-wrap gap-2">
                     {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
                       (value) => (
@@ -545,12 +621,18 @@ export default function CreateExpenseScreen({
                     variant="outline"
                     disabled={saving || members.length === 0}
                     onPress={() => {
-                      setParticipantIds(everyoneSelected ? [] : members.map(member => member._id));
+                      setParticipantIds(
+                        everyoneSelected
+                          ? []
+                          : members.map((member) => member._id),
+                      );
                       setFieldErrors({});
                       setMessage("");
                     }}
                   >
-                    <Text>{everyoneSelected ? "Clear selection" : "Select everyone"}</Text>
+                    <Text>
+                      {everyoneSelected ? "Clear selection" : "Select everyone"}
+                    </Text>
                   </Button>
 
                   {unavailableIds.map((id) => (
@@ -616,13 +698,21 @@ export default function CreateExpenseScreen({
                           label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
                           icon="cash-outline"
                           keyboardType="decimal-pad"
-                          placeholder={formatCurrencyAmount(0, splitType === "PERCENTAGE" ? "PHP" : group?.currency)}
+                          placeholder={formatCurrencyAmount(
+                            0,
+                            splitType === "PERCENTAGE"
+                              ? "PHP"
+                              : group?.currency,
+                          )}
                           value={shares[id] ?? ""}
                           editable={!saving}
                           onChangeText={(value) => {
                             setFieldErrors({});
                             setMessage("");
-                            setShares(current => ({ ...current, [id]: value }));
+                            setShares((current) => ({
+                              ...current,
+                              [id]: value,
+                            }));
                           }}
                         />
                       );
@@ -641,17 +731,30 @@ export default function CreateExpenseScreen({
                   ) : (
                     <>
                       {participantIds.map((id, index) => {
-                        const member = members.find(member => member._id === id);
+                        const member = members.find(
+                          (member) => member._id === id,
+                        );
                         return (
-                          <View key={id} className="flex-row items-center justify-between gap-3">
-                            <Text className="flex-1">{member?.firstName} {member?.lastName}{id === currentUserId ? " (you)" : ""}</Text>
+                          <View
+                            key={id}
+                            className="flex-row items-center justify-between gap-3"
+                          >
+                            <Text className="flex-1">
+                              {member?.firstName} {member?.lastName}
+                              {id === currentUserId ? " (you)" : ""}
+                            </Text>
                             <Text className="font-semibold">
-                              {preview.amounts[index] === null ? "—" : formatShare(preview.amounts[index])}
+                              {preview.amounts[index] === null
+                                ? "—"
+                                : formatShare(preview.amounts[index])}
                             </Text>
                           </View>
                         );
                       })}
-                      <Text className="text-sm text-muted-foreground" accessibilityLiveRegion="polite">
+                      <Text
+                        className="text-sm text-muted-foreground"
+                        accessibilityLiveRegion="polite"
+                      >
                         {splitType === "EQUAL"
                           ? "Any rounding remainder goes to the first selected participant."
                           : preview.complete
@@ -660,7 +763,12 @@ export default function CreateExpenseScreen({
                               ? "Enter a valid share for every selected participant."
                               : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
                       </Text>
-                      {splitType === "PERCENTAGE" ? <Text className="text-xs text-muted-foreground">Estimated amounts; rounding is reconciled to the expense total once percentages reach 100%.</Text> : null}
+                      {splitType === "PERCENTAGE" ? (
+                        <Text className="text-xs text-muted-foreground">
+                          Estimated amounts; rounding is reconciled to the
+                          expense total once percentages reach 100%.
+                        </Text>
+                      ) : null}
                     </>
                   )}
                 </View>
@@ -668,8 +776,12 @@ export default function CreateExpenseScreen({
                 <DateField
                   label="Expense date"
                   value={date}
-              error={fieldErrors.date}
-                  onChange={value => { setDate(value); setFieldErrors({}); setMessage(""); }}
+                  error={fieldErrors.date}
+                  onChange={(value) => {
+                    setDate(value);
+                    setFieldErrors({});
+                    setMessage("");
+                  }}
                   disabled={saving}
                 />
 
