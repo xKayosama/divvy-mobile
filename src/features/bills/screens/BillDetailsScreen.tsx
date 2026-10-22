@@ -76,7 +76,7 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
                 </View>
                 <View className="min-w-0 flex-1 gap-1">
                   <Text className="text-xl font-semibold">{bill.name}</Text>
-                  <Text className="text-sm capitalize text-muted-foreground">{bill.category.toLowerCase()}</Text>
+                  <Text className="text-sm capitalize text-muted-foreground">{bill.category.toLowerCase().replace(/_/g, " ")}</Text>
                 </View>
               </View>
               <BillStatusBadge status={bill.status} />

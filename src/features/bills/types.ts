@@ -8,6 +8,14 @@ export type BillCategory =
   | "PHONE"
   | "SUBSCRIPTION"
   | "INSURANCE"
+  | "GAS"
+  | "ASSOCIATION_DUES"
+  | "EDUCATION"
+  | "CHILDCARE"
+  | "LOAN"
+  | "CREDIT_CARD"
+  | "PROPERTY_TAX"
+  | "MAINTENANCE"
   | "OTHER";
 
 export type BillStatus = "PENDING" | "PAID" | "OVERDUE";

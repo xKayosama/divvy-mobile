@@ -227,7 +227,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
         </Animated.View>
         {hasFilters ? (
           <Text className="text-xs text-muted-foreground">{[
-            filters.category?.toLowerCase(), filters.status?.toLowerCase(),
+            filters.category?.toLowerCase().replace(/_/g, " "), filters.status?.toLowerCase(),
             filters.isRecurring === undefined ? undefined : filters.isRecurring ? "Recurring" : "One-time",
           ].filter(Boolean).join(" · ")}</Text>
         ) : null}
@@ -321,7 +321,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
             </Text>
 
             <Text style={{ color: colors.mutedForeground }}>
-              {item.category.toLowerCase()} · Due{" "}
+              {item.category.toLowerCase().replace(/_/g, " ")} · Due{" "}
               {new Date(item.dueDate).toLocaleDateString("en-PH", {
                 month: "short",
                 day: "numeric",

@@ -135,3 +135,29 @@ test("persisted item drafts round-trip line totals and member IDs without mutati
   items[0].memberIds.pop();
   assert.deepEqual(saved[0].memberIds, ["a", "b"]);
 });
+
+
+test("tax and tip preview independently allocate by subtotal and equally", () => {
+ const result=itemizedPreview([draft("75",["a"]),draft("25",["b"])],"130","PHP",["a","b"],{tax:{amount:"20",allocation:"PROPORTIONAL"},tip:{amount:"10",allocation:"EQUAL"}});
+ assert.equal(result.error,"");
+ assert.deepEqual(result.participants.map(p=>p.amount),[95,35]);
+ assert.deepEqual(result.breakdown.a,{items:75,tax:15,tip:5});
+ assert.equal(result.adjustments.tax.amount,20);
+});
+for(const [currency,subtotal,extra,total,expected] of [["JPY","4","1","5",[4,1]],["PHP","0.04","0.01","0.05",[.04,.01]],["KWD","0.004","0.001","0.005",[.004,.001]]]) {
+ test(`${currency}: adjustment preview conserves native minor units`,()=>{
+  const result=itemizedPreview([draft(String(Number(subtotal)*.75),["a"]),draft(String(Number(subtotal)*.25),["b"])],total,currency,["a","b"],{tax:{amount:extra,allocation:"PROPORTIONAL"},tip:{amount:"",allocation:"EQUAL"}});
+  assert.equal(result.error,"");assert.deepEqual(result.participants.map(p=>p.amount),expected);
+ });
+}
+test("invalid extras, mismatch and zero proportional basis block itemized saving",()=>{
+ for(const value of ["-1","0.001","bad"]) assert.ok(itemizedPreview([draft("1")],"1","PHP",["a","b"],{tax:{amount:value,allocation:"EQUAL"},tip:{amount:"",allocation:"EQUAL"}}).error);
+ assert.ok(itemizedPreview([draft("0")],"1","JPY",["a","b"],{tax:{amount:"1",allocation:"PROPORTIONAL"},tip:{amount:"",allocation:"EQUAL"}}).error);
+ const equal=itemizedPreview([draft("0")],"1","JPY",["a","b"],{tax:{amount:"1",allocation:"EQUAL"},tip:{amount:"",allocation:"PROPORTIONAL"}});
+ assert.deepEqual(equal.participants.map(p=>p.amount),[1,0]);
+});
+test("saved adjustment drafts preserve choices and legacy expenses start without extras",()=>{
+ const {adjustmentDrafts}=require("../src/features/expenses/itemized.ts");
+ assert.equal(adjustmentDrafts().tax.amount,"");
+ assert.deepEqual(adjustmentDrafts({tip:{amount:2,allocation:"EQUAL"}}).tip,{amount:"2",allocation:"EQUAL"});
+});

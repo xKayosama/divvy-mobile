@@ -1,17 +1,7 @@
+import { expenseCategoryOptions } from "./categoryIcons";
 import type { ExpenseCategory, GetExpensesRequest } from "./types";
 
-export const expenseCategories: ExpenseCategory[] = [
-  "GROCERIES",
-  "FOOD",
-  "RENT",
-  "UTILITIES",
-  "INTERNET",
-  "TRANSPORTATION",
-  "HEALTHCARE",
-  "ENTERTAINMENT",
-  "SHOPPING",
-  "OTHERS",
-];
+export const expenseCategories: ExpenseCategory[] = expenseCategoryOptions.map(option => option.value);
 
 export type ExpenseFilters = Pick<
   GetExpensesRequest,

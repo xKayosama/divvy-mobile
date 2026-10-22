@@ -76,7 +76,7 @@ export default function ExpenseFiltersModal({
                 Filter expenses
               </Text>
             </View>
-            <CategorySelector inline value={category} options={expenseCategoryOptions} onChange={setCategory} onClear={() => setCategory(undefined)} />
+            <CategorySelector inline compact value={category} options={expenseCategoryOptions} onChange={setCategory} onClear={() => setCategory(undefined)} />
             <DateField
               label="Start date (optional)"
               value={startDate}

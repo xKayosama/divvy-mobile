@@ -1,6 +1,26 @@
 import { currencyScale, validAmount } from "../groups/money";
 import type { ReceiptExtraction } from "../receipts/types";
-import type { ExpenseItem } from "./types";
+import type { ExpenseItem, ItemizedAdjustments } from "./types";
+
+export type AdjustmentDraft = {
+  amount: string;
+  allocation: "EQUAL" | "PROPORTIONAL";
+};
+export type AdjustmentsDraft = Record<"tax" | "tip", AdjustmentDraft>;
+export function adjustmentDrafts(
+  saved?: ItemizedAdjustments,
+): AdjustmentsDraft {
+  return {
+    tax: {
+      amount: String(saved?.tax?.amount ?? ""),
+      allocation: saved?.tax?.allocation ?? "PROPORTIONAL",
+    },
+    tip: {
+      amount: String(saved?.tip?.amount ?? ""),
+      allocation: saved?.tip?.allocation ?? "PROPORTIONAL",
+    },
+  };
+}
 
 export const MAX_EXPENSE_ITEMS = 100;
 export type ItemDraft = {
@@ -44,6 +64,7 @@ export function itemizedPreview(
   amount: string,
   currency: string,
   activeMemberIds: string[],
+  adjustments: AdjustmentsDraft = adjustmentDrafts(),
 ) {
   const scale = currencyScale(currency);
   const totals = new Map<string, bigint>();
@@ -89,17 +110,73 @@ export function itemizedPreview(
       memberIds: [...item.memberIds],
     });
   }
+  const normalizedAdjustments: ItemizedAdjustments = {};
+  const baseShares = [...totals.values()];
+  const breakdown = new Map(
+    [...totals].map(([id, value]) => [
+      id,
+      { items: Number(value) / scale, tax: 0, tip: 0 },
+    ]),
+  );
+  for (const key of ["tax", "tip"] as const) {
+    const charge = adjustments[key];
+    const value = charge.amount.trim().replace(",", ".") || "0";
+    if (
+      !validAmount(value, currency, true) ||
+      !["EQUAL", "PROPORTIONAL"].includes(charge.allocation)
+    )
+      return {
+        error: `Enter a valid nonnegative ${key} amount in ${currency}.`,
+      };
+    const extra = BigInt(Math.round(Number(value) * scale));
+    const weights = baseShares.map((value) =>
+      charge.allocation === "EQUAL" ? 1n : value,
+    );
+    const denominator = weights.reduce((sum, value) => sum + value, 0n);
+    if (extra > 0n && denominator === 0n)
+      return {
+        error: `Cannot allocate ${key} by item amounts when items total zero. Choose equally.`,
+      };
+    if (extra > 0n) {
+      const parts = weights.map((weight, index) => ({
+        index,
+        units: (extra * weight) / denominator,
+        remainder: (extra * weight) % denominator,
+      }));
+      const remaining =
+        extra - parts.reduce((sum, part) => sum + part.units, 0n);
+      const ordered = [...parts].sort((a, b) =>
+        a.remainder === b.remainder
+          ? a.index - b.index
+          : a.remainder > b.remainder
+            ? -1
+            : 1,
+      );
+      for (let i = 0; i < Number(remaining); i++) ordered[i].units++;
+      [...totals.keys()].forEach((id, i) => {
+        totals.set(id, totals.get(id)! + parts[i].units);
+        breakdown.get(id)![key] = Number(parts[i].units) / scale;
+      });
+    }
+    units += extra;
+    normalizedAdjustments[key] = {
+      amount: Number(value),
+      allocation: charge.allocation,
+    };
+  }
   if (!validAmount(amount, currency))
     return { error: "Enter a valid expense total." };
   const total = BigInt(Math.round(Number(amount) * scale));
   if (units !== total)
     return {
       error:
-        "Item totals must match the expense total. Add tax or tip as separate assigned items, or correct the totals.",
+        "Items plus tax and tip must match the expense total. Check the line totals and extras.",
     };
   return {
     error: "",
     items: normalized,
+    adjustments: normalizedAdjustments,
+    breakdown: Object.fromEntries(breakdown),
     participants: [...totals].map(([userId, units]) => ({
       userId,
       amount: Number(units) / scale,

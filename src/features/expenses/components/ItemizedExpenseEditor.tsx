@@ -16,11 +16,14 @@ import {
   itemizedPreview,
   MAX_EXPENSE_ITEMS,
   type ItemDraft,
+  type AdjustmentsDraft,
 } from "../itemized";
 import type { ExpenseUser } from "../types";
 
 export function ItemizedExpenseEditor({
   items,
+  adjustments,
+  onAdjustmentsChange,
   onChange,
   members,
   amount,
@@ -28,6 +31,8 @@ export function ItemizedExpenseEditor({
   disabled,
 }: {
   items: ItemDraft[];
+  adjustments: AdjustmentsDraft;
+  onAdjustmentsChange: (value: AdjustmentsDraft) => void;
   onChange: (items: ItemDraft[]) => void;
   members: ExpenseUser[];
   amount: string;
@@ -47,6 +52,7 @@ export function ItemizedExpenseEditor({
     amount.trim().replace(",", "."),
     currency,
     activeIds,
+    adjustments,
   );
   const scale = currencyScale(currency);
   const validTotals = items.every((item) =>
@@ -75,12 +81,13 @@ export function ItemizedExpenseEditor({
           Items & assignments
         </Text>
         <Text className="text-sm text-muted-foreground">
-          Enter each item’s total price for the quantity shown.
-          Shared items split equally among their assigned members.
+          Enter each item’s total price for the quantity shown. Shared items
+          split equally among their assigned members.
         </Text>
         <Text className="text-sm text-muted-foreground">
-          Add tax or tip as separate items and choose who shares them. The line
-          totals must match the expense total.
+          Add tax and tip below. Items plus extras must match the expense total.
+          If a receipt already lists tax or tip as items, remove those lines
+          before using the extra fields.
         </Text>
       </View>
       {items.map((item, index) => {
@@ -111,7 +118,7 @@ export function ItemizedExpenseEditor({
                   color={colors.primary}
                   accessible={false}
                 />
-                <Text className="min-w-0 flex-1 shrink font-semibold">
+                <Text numberOfLines={2} ellipsizeMode="tail" className="min-w-0 flex-1 shrink font-semibold web:break-words">
                   {index + 1}. {item.description || "New item"}
                 </Text>
                 <Ionicons
@@ -143,6 +150,9 @@ export function ItemizedExpenseEditor({
                 <FormField
                   label="Item description"
                   icon="receipt-outline"
+                  multiline
+                  maxVisibleLines={4}
+                  submitBehavior="newline"
                   value={item.description}
                   maxLength={200}
                   placeholder="e.g. Shared pizza"
@@ -228,6 +238,76 @@ export function ItemizedExpenseEditor({
         />
         <Text>Add item</Text>
       </Button>
+      <View className="gap-5 rounded-[24px] border border-border bg-card p-5">
+        <Text accessibilityRole="header" className="text-lg font-semibold">
+          Tax & tip
+        </Text>
+        <Text className="text-sm text-muted-foreground">
+          Share extras among members assigned to items. By item amounts uses
+          each person’s item subtotal, before tax and tip. Leave amounts blank
+          for none.
+        </Text>
+        {(["tax", "tip"] as const).map((key) => (
+          <View key={key} className="gap-3">
+            <FormField
+              label={`${key === "tax" ? "Tax" : "Tip"} (${currency})`}
+              icon={key === "tax" ? "document-text-outline" : "heart-outline"}
+              keyboardType="decimal-pad"
+              placeholder={formatCurrencyAmount(0, currency)}
+              value={adjustments[key].amount}
+              editable={!disabled}
+              onChangeText={(amount) =>
+                onAdjustmentsChange({
+                  ...adjustments,
+                  [key]: { ...adjustments[key], amount },
+                })
+              }
+            />
+            <View className="flex-row flex-wrap gap-2">
+              {(["EQUAL", "PROPORTIONAL"] as const).map((allocation) => (
+                <Button
+                  key={allocation}
+                  variant={
+                    adjustments[key].allocation === allocation
+                      ? "default"
+                      : "outline"
+                  }
+                  disabled={disabled}
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    checked: adjustments[key].allocation === allocation,
+                  }}
+                  accessibilityLabel={`${key === "tax" ? "Tax" : "Tip"}: ${allocation === "EQUAL" ? "Equally" : "By item amounts"}`}
+                  onPress={() =>
+                    onAdjustmentsChange({
+                      ...adjustments,
+                      [key]: { ...adjustments[key], allocation },
+                    })
+                  }
+                >
+                  <Ionicons
+                    name={
+                      allocation === "EQUAL"
+                        ? "people-outline"
+                        : "pie-chart-outline"
+                    }
+                    size={18}
+                    color={
+                      adjustments[key].allocation === allocation
+                        ? colors.primaryForeground
+                        : colors.primary
+                    }
+                    accessible={false}
+                  />
+                  <Text>
+                    {allocation === "EQUAL" ? "Equally" : "By item amounts"}
+                  </Text>
+                </Button>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
       <View className="gap-3 rounded-[24px] bg-secondary p-5">
         <Text className="font-semibold">Review itemized split</Text>
         <Text>
@@ -263,13 +343,25 @@ export function ItemizedExpenseEditor({
                   <Text className="min-w-0 flex-1">
                     {member?.firstName} {member?.lastName}
                   </Text>
-                  <Text className="font-semibold">{format(part.amount)}</Text>
+                  <View className="items-end gap-1">
+                    <Text className="font-semibold">{format(part.amount)}</Text>
+                    <Text className="text-xs text-muted-foreground">
+                      Items{" "}
+                      {format(preview.breakdown?.[part.userId]?.items ?? 0)}
+                    </Text>
+                    <Text className="text-xs text-muted-foreground">
+                      Tax {format(preview.breakdown?.[part.userId]?.tax ?? 0)} ·
+                      Tip {format(preview.breakdown?.[part.userId]?.tip ?? 0)}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
             <Text className="text-sm text-muted-foreground">
               All items assigned. Shares match the expense total. Each line’s
-              rounding remainder goes to its first assigned member.
+              rounding remainder goes to its first assigned member. Tax and tip
+              rounding goes to the largest fractional remainder; ties follow
+              item-member order.
             </Text>
           </>
         )}

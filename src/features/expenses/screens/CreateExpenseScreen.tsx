@@ -1,6 +1,8 @@
+import { parseShareWeight, MAX_SHARE_WEIGHT } from "../shareSplit";
 import { ExpenseMemberSelector } from "../components/ExpenseMemberSelector";
 import { ItemizedExpenseEditor } from "../components/ItemizedExpenseEditor";
 import {
+  adjustmentDrafts,
   emptyItem,
   existingItemDrafts,
   receiptItemDrafts,
@@ -79,6 +81,12 @@ export default function CreateExpenseScreen({
         ? receiptItemDrafts(receipt)
         : [emptyItem()],
   );
+  const [adjustments, setAdjustments] = useState(() => adjustmentDrafts(
+    expense?.adjustments ?? (receipt ? {
+      ...(receipt.tax != null ? { tax: { amount: receipt.tax, allocation: "PROPORTIONAL" as const } } : {}),
+      ...(receipt.tip != null ? { tip: { amount: receipt.tip, allocation: "PROPORTIONAL" as const } } : {}),
+    } : undefined),
+  ));
   const [receiptReviewed, setReceiptReviewed] = useState(false);
   const [description, setDescription] = useState(
     expense?.description ?? draft?.description ?? "",
@@ -95,7 +103,9 @@ export default function CreateExpenseScreen({
   const [participantIds, setParticipantIds] = useState<string[]>(
     expense?.participants.map((p, i) => p.userId?._id ?? `missing:${i}`) ?? [],
   );
-  const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE">(
+  const [splitType, setSplitType] = useState<
+    "EQUAL" | "EXACT" | "PERCENTAGE" | "SHARES"
+  >(
     expense?.splitType === "ITEMIZED"
       ? "EQUAL"
       : (expense?.splitType ?? "EQUAL"),
@@ -105,7 +115,11 @@ export default function CreateExpenseScreen({
       expense?.participants.map((p, i) => [
         p.userId?._id ?? `missing:${i}`,
         String(
-          expense.splitType === "PERCENTAGE" ? (p.percentage ?? "") : p.amount,
+          expense.splitType === "SHARES"
+            ? (p.shares ?? 1)
+            : expense.splitType === "PERCENTAGE"
+              ? (p.percentage ?? "")
+              : p.amount,
         ),
       ]) ?? [],
     ),
@@ -119,6 +133,7 @@ export default function CreateExpenseScreen({
   const snapshot = JSON.stringify({
     mode,
     items,
+    adjustments,
     description,
     amount,
     category,
@@ -162,11 +177,15 @@ export default function CreateExpenseScreen({
   const unavailableIds = participantIds.filter(
     (id) => !members.some((member) => member._id === id),
   );
+  const effectiveShares =
+    splitType === "SHARES"
+      ? Object.fromEntries(participantIds.map((id) => [id, shares[id] ?? "1"]))
+      : shares;
   const preview = splitPreview(
     amount,
     splitType,
     participantIds,
-    shares,
+    effectiveShares,
     group?.currency,
   );
   const scale = currencyScale(group?.currency);
@@ -275,17 +294,37 @@ export default function CreateExpenseScreen({
         normalizedAmount,
         group.currency,
         members.map((member) => member._id),
+        adjustments,
       );
       if (result.error || !result.items) {
         fieldError("items", result.error || "Review the itemized split.");
         return;
       }
-      body = { ...fields, splitType: "ITEMIZED", items: result.items };
+      body = { ...fields, splitType: "ITEMIZED", items: result.items, adjustments: result.adjustments };
     } else if (splitType === "EQUAL") {
       body = {
         ...fields,
         splitType,
         participants: participantIds.map((userId) => ({ userId })),
+      };
+    } else if (splitType === "SHARES") {
+      const weights = participantIds.map((id) =>
+        parseShareWeight(effectiveShares[id] ?? ""),
+      );
+      if (weights.some((weight) => weight === null)) {
+        fieldError(
+          "shares",
+          `Enter a whole number of shares from 1 to ${MAX_SHARE_WEIGHT.toLocaleString()} for every selected member.`,
+        );
+        return;
+      }
+      body = {
+        ...fields,
+        splitType: "SHARES",
+        participants: participantIds.map((userId, index) => ({
+          userId,
+          shares: weights[index]!,
+        })),
       };
     } else {
       const values = participantIds.map((id) =>
@@ -593,9 +632,10 @@ export default function CreateExpenseScreen({
                     label="Description"
                     icon="receipt-outline"
                     placeholder="e.g. Weekly groceries"
-                    returnKeyType="next"
-                    submitBehavior="submit"
-                    onSubmitEditing={() => amountInput.current?.focus()}
+                    multiline
+                    maxVisibleLines={4}
+                    submitBehavior="newline"
+                    helperText="Keep the description short; add extra details in Notes."
                     value={description}
                     error={fieldErrors.description}
                     onChangeText={(value) => {
@@ -648,6 +688,8 @@ export default function CreateExpenseScreen({
                   <>
                     <FormMessage message={fieldErrors.items ?? ""} />
                     <ItemizedExpenseEditor
+                      adjustments={adjustments}
+                      onAdjustmentsChange={(value) => { setAdjustments(value); setFieldErrors({}); setMessage(""); }}
                       items={items}
                       onChange={(value) => {
                         setItems(value);
@@ -680,89 +722,196 @@ export default function CreateExpenseScreen({
                         How to split
                       </Text>
                       <View className="flex-row flex-wrap gap-2">
-                        {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
-                          (value) => (
-                            <Button
-                              key={value}
-                              variant={
-                                splitType === value ? "default" : "outline"
-                              }
-                              className="min-h-12 h-auto grow rounded-2xl px-4 py-3"
-                              disabled={saving}
-                              accessibilityState={{
-                                selected: splitType === value,
-                              }}
-                              onPress={() => {
-                                if (value !== splitType) setShares({});
-                                setSplitType(value);
-                                setMessage("");
-                              }}
-                            >
-                              <Ionicons
-                                name={value === "EQUAL" ? "people-outline" : value === "EXACT" ? "cash-outline" : "pie-chart-outline"}
-                                size={20}
-                                color={splitType === value ? colors.primaryForeground : colors.primary}
-                                accessible={false}
-                              />
-                              <Text className="text-sm font-semibold">
-                                {value === "EQUAL"
-                                  ? "Equally"
+                        {(
+                          ["EQUAL", "EXACT", "PERCENTAGE", "SHARES"] as const
+                        ).map((value) => (
+                          <Button
+                            key={value}
+                            variant={
+                              splitType === value ? "default" : "outline"
+                            }
+                            className="min-h-12 h-auto grow rounded-2xl px-4 py-3"
+                            disabled={saving}
+                            accessibilityState={{
+                              selected: splitType === value,
+                            }}
+                            onPress={() => {
+                              if (value !== splitType)
+                                setShares(
+                                  value === "SHARES"
+                                    ? Object.fromEntries(
+                                        participantIds.map((id) => [id, "1"]),
+                                      )
+                                    : {},
+                                );
+                              setSplitType(value);
+                              setMessage("");
+                            }}
+                          >
+                            <Ionicons
+                              name={
+                                value === "EQUAL"
+                                  ? "people-outline"
                                   : value === "EXACT"
-                                    ? "By amount"
+                                    ? "cash-outline"
+                                    : value === "SHARES"
+                                      ? "layers-outline"
+                                      : "pie-chart-outline"
+                              }
+                              size={20}
+                              color={
+                                splitType === value
+                                  ? colors.primaryForeground
+                                  : colors.primary
+                              }
+                              accessible={false}
+                            />
+                            <Text className="text-sm font-semibold">
+                              {value === "EQUAL"
+                                ? "Equally"
+                                : value === "EXACT"
+                                  ? "By amount"
+                                  : value === "SHARES"
+                                    ? "By shares"
                                     : "By percent"}
-                              </Text>
-                            </Button>
-                          ),
-                        )}
+                            </Text>
+                          </Button>
+                        ))}
                       </View>
                       <Text className="text-sm text-muted-foreground">
                         {splitType === "EQUAL"
                           ? "Share the total equally between selected members. See each person’s amount below."
-                          : splitType === "EXACT"
-                            ? "Enter the amount each selected member owes. The amounts must match the total."
-                            : "Enter each selected member’s percentage. Percentages must add up to 100%."}
+                          : splitType === "SHARES"
+                            ? "Assign weights: 2 shares and 1 share split the cost in a 2:1 ratio. Each person starts with 1 share."
+                            : splitType === "EXACT"
+                              ? "Enter the amount each selected member owes. The amounts must match the total."
+                              : "Enter each selected member’s percentage. Percentages must add up to 100%."}
                       </Text>
                     </View>
 
                     {splitType !== "EQUAL" ? (
                       <View className="gap-4 rounded-[24px] bg-card p-5">
                         <Text className="font-semibold">
-                          {splitType === "EXACT"
-                            ? "Member amounts"
-                            : "Member percentages"}
+                          {splitType === "SHARES"
+                            ? "Member shares"
+                            : splitType === "EXACT"
+                              ? "Member amounts"
+                              : "Member percentages"}
                         </Text>
                         <Text className="text-sm text-muted-foreground">
-                          {splitType === "EXACT"
-                            ? "Amounts must add up to the expense total."
-                            : "Percentages must add up to 100%."}
+                          {splitType === "SHARES"
+                            ? "Use positive whole numbers. More shares means a larger part of the total."
+                            : splitType === "EXACT"
+                              ? "Amounts must add up to the expense total."
+                              : "Percentages must add up to 100%."}
                         </Text>
                         {participantIds.map((id) => {
                           const member = members.find(
                             (value) => value._id === id,
                           );
                           return (
-                            <FormField
-                              key={id}
-                              label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
-                              icon="cash-outline"
-                              keyboardType="decimal-pad"
-                              placeholder={formatCurrencyAmount(
-                                0,
-                                splitType === "PERCENTAGE"
-                                  ? "PHP"
-                                  : group?.currency,
-                              )}
-                              value={shares[id] ?? ""}
-                              editable={!saving}
-                              onChangeText={(value) => {
-                                setFieldErrors({});
-                                setMessage("");
-                                setShares((current) => ({
-                                  ...current,
-                                  [id]: value,
-                                }));
-                              }}
-                            />
+                            <View key={id} className="flex-row items-end gap-2">
+                              <View className="min-w-0 flex-1">
+                                <FormField
+                                  label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : splitType === "SHARES" ? " (shares)" : ""}`}
+                                  icon={
+                                    splitType === "SHARES"
+                                      ? "layers-outline"
+                                      : "cash-outline"
+                                  }
+                                  keyboardType={
+                                    splitType === "SHARES"
+                                      ? "number-pad"
+                                      : "decimal-pad"
+                                  }
+                                  placeholder={
+                                    splitType === "SHARES"
+                                      ? "1"
+                                      : formatCurrencyAmount(
+                                          0,
+                                          splitType === "PERCENTAGE"
+                                            ? "PHP"
+                                            : group?.currency,
+                                        )
+                                  }
+                                  value={effectiveShares[id] ?? ""}
+                                  editable={!saving}
+                                  onChangeText={(value) => {
+                                    setFieldErrors({});
+                                    setMessage("");
+                                    setShares((current) => ({
+                                      ...current,
+                                      [id]: value,
+                                    }));
+                                  }}
+                                />
+                              </View>
+                              {splitType === "SHARES" ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={
+                                      saving ||
+                                      (parseShareWeight(effectiveShares[id]) ??
+                                        1) <= 1
+                                    }
+                                    accessibilityLabel={`Decrease shares for ${member?.firstName ?? "member"}`}
+                                    onPress={() => {
+                                      setShares((current) => ({
+                                        ...current,
+                                        [id]: String(
+                                          Math.max(
+                                            1,
+                                            (parseShareWeight(
+                                              effectiveShares[id],
+                                            ) ?? 1) - 1,
+                                          ),
+                                        ),
+                                      }));
+                                      setFieldErrors({});
+                                      setMessage("");
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="remove"
+                                      size={20}
+                                      color={colors.primary}
+                                      accessible={false}
+                                    />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={
+                                      saving ||
+                                      (parseShareWeight(effectiveShares[id]) ??
+                                        0) >= MAX_SHARE_WEIGHT
+                                    }
+                                    accessibilityLabel={`Increase shares for ${member?.firstName ?? "member"}`}
+                                    onPress={() => {
+                                      setShares((current) => ({
+                                        ...current,
+                                        [id]: String(
+                                          (parseShareWeight(
+                                            effectiveShares[id],
+                                          ) ?? 0) + 1,
+                                        ),
+                                      }));
+                                      setFieldErrors({});
+                                      setMessage("");
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="add"
+                                      size={20}
+                                      color={colors.primary}
+                                      accessible={false}
+                                    />
+                                  </Button>
+                                </>
+                              ) : null}
+                            </View>
                           );
                         })}
                       </View>
@@ -803,13 +952,17 @@ export default function CreateExpenseScreen({
                             className="text-sm text-muted-foreground"
                             accessibilityLiveRegion="polite"
                           >
-                            {splitType === "EQUAL"
-                              ? "Any rounding remainder goes to the first selected participant."
-                              : preview.complete
-                                ? "All shares assigned."
-                                : preview.remaining === 0
-                                  ? "Enter a valid share for every selected participant."
-                                  : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
+                            {splitType === "SHARES"
+                              ? preview.complete
+                                ? `${preview.totalShares} total shares. Rounding goes to the largest fractional remainders; ties follow member order.`
+                                : "Enter a valid whole number of shares for every selected member."
+                              : splitType === "EQUAL"
+                                ? "Any rounding remainder goes to the first selected participant."
+                                : preview.complete
+                                  ? "All shares assigned."
+                                  : preview.remaining === 0
+                                    ? "Enter a valid share for every selected participant."
+                                    : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
                           </Text>
                           {splitType === "PERCENTAGE" ? (
                             <Text className="text-xs text-muted-foreground">
@@ -838,7 +991,10 @@ export default function CreateExpenseScreen({
                 <FormField
                   label="Notes"
                   icon="document-text-outline"
-                  placeholder="Optional notes"
+                  placeholder="Add extra details (optional)"
+                  multiline
+                  maxVisibleLines={6}
+                  submitBehavior="newline"
                   value={notes}
                   onChangeText={setNotes}
                   editable={!saving}

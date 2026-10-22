@@ -12,13 +12,14 @@ type CategoryOption<T extends string> = {
   icon: ComponentProps<typeof Ionicons>["name"];
 };
 
-export function CategorySelector<T extends string>({ value, options, onChange, onClear, disabled = false, inline = false }: {
+export function CategorySelector<T extends string>({ value, options, onChange, onClear, disabled = false, inline = false, compact = true }: {
   value?: T;
   options: readonly CategoryOption<T>[];
   onChange: (value: T) => void;
   onClear?: () => void;
   disabled?: boolean;
   inline?: boolean;
+  compact?: boolean;
 }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -28,16 +29,17 @@ export function CategorySelector<T extends string>({ value, options, onChange, o
     ...(onClear ? [{ key: "all", label: "All categories", icon: "grid-outline" as const, selected: value === undefined, choose: onClear }] : []),
     ...options.map(option => ({ key: option.value, label: option.label, icon: option.icon, selected: value === option.value, choose: () => onChange(option.value) })),
   ];
-  const rows = Array.from({ length: Math.ceil(choices.length / 2) }, (_, index) => choices.slice(index * 2, index * 2 + 2));
+  const columns = compact ? 3 : 2;
+  const rows = Array.from({ length: Math.ceil(choices.length / columns) }, (_, index) => choices.slice(index * columns, index * columns + columns));
   const grid = (
-    <View className="gap-3">
+    <View className={compact ? "gap-2" : "gap-3"}>
       {rows.map((row, index) => (
-        <View key={index} className="flex-row gap-3">
+        <View key={index} className={`flex-row ${compact ? "gap-2" : "gap-3"}`}>
           {row.map(choice => (
             <Button
               key={choice.key}
               variant="outline"
-              className={`min-h-24 min-w-0 flex-1 flex-col gap-2 rounded-2xl border-2 px-3 py-4 ${choice.selected ? "bg-secondary" : ""}`}
+              className={`min-w-0 flex-1 flex-col rounded-2xl border-2 ${compact ? "min-h-16 gap-1 px-2 py-2" : "min-h-24 gap-2 px-3 py-4"} ${choice.selected ? "bg-secondary" : ""}`}
               style={{ borderColor: choice.selected ? colors.primary : colors.border }}
               accessibilityRole="radio"
               accessibilityLabel={choice.label}
@@ -46,13 +48,13 @@ export function CategorySelector<T extends string>({ value, options, onChange, o
               onPress={() => { choice.choose(); setOpen(false); }}
             >
               {choice.selected ? (
-                <View className="absolute right-2 top-2"><Ionicons name="checkmark-circle" size={18} color={colors.primary} accessible={false} /></View>
+                <View className={compact ? "absolute right-1 top-1" : "absolute right-2 top-2"}><Ionicons name="checkmark-circle" size={compact ? 14 : 18} color={colors.primary} accessible={false} /></View>
               ) : null}
-              <Ionicons name={choice.icon} size={28} color={colors.primary} accessible={false} />
-              <Text className="text-center text-sm">{choice.label}</Text>
+              <Ionicons name={choice.icon} size={compact ? 20 : 28} color={colors.primary} accessible={false} />
+              <Text className={`w-full shrink text-center ${compact ? "text-xs" : "text-sm"}`}>{choice.label}</Text>
             </Button>
           ))}
-          {row.length === 1 ? <View className="flex-1" /> : null}
+          {Array.from({ length: columns - row.length }, (_, index) => <View key={`empty-${index}`} className="flex-1" />)}
         </View>
       ))}
     </View>
