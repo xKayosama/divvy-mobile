@@ -26,6 +26,8 @@ import {
   useGetMyGroupsQuery,
 } from "@/features/groups/groupsApi";
 import { useTheme } from "@/theme/ThemeProvider";
+import { useAppSelector } from "@/hooks/redux";
+import { splitPreview } from "../splitPreview";
 import { categoryIcons } from "../categoryIcons";
 import { expenseCategories } from "../filters";
 import {
@@ -50,6 +52,7 @@ export default function CreateExpenseScreen({
   receiptImageUri?: string;
 }) {
   const { colors } = useTheme();
+  const currentUserId = useAppSelector(state => state.auth.user?.id);
   const draft = receipt ? receiptDraft(receipt) : undefined;
   const [receiptReviewed, setReceiptReviewed] = useState(false);
   const [description, setDescription] = useState(
@@ -61,7 +64,7 @@ export default function CreateExpenseScreen({
   const [category, setCategory] = useState<ExpenseCategory>(
     expense?.category ?? "OTHERS",
   );
-  const [paidBy, setPaidBy] = useState(expense?.paidBy?._id ?? "");
+  const [paidBy, setPaidBy] = useState(expense ? (expense.paidBy?._id ?? "") : (currentUserId ?? ""));
   const [participantIds, setParticipantIds] = useState<string[]>(
     expense?.participants.map((p, i) => p.userId?._id ?? `missing:${i}`) ?? [],
   );
@@ -117,6 +120,9 @@ export default function CreateExpenseScreen({
   const unavailableIds = participantIds.filter(
     (id) => !members.some((member) => member._id === id),
   );
+  const preview = splitPreview(amount, splitType, participantIds, shares);
+  const formatShare = (value: number) => `${group?.currency ?? ""} ${(value / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
+  const everyoneSelected = members.length > 0 && members.every(member => participantIds.includes(member._id)) && unavailableIds.length === 0;
 
   function toggleParticipant(id: string) {
     setMessage("");
@@ -562,6 +568,17 @@ export default function CreateExpenseScreen({
                   <Text className="text-sm text-muted-foreground">
                     Select everyone sharing this expense.
                   </Text>
+                  <Button
+                    variant="outline"
+                    disabled={saving || members.length === 0}
+                    onPress={() => {
+                      setParticipantIds(everyoneSelected ? [] : members.map(member => member._id));
+                      setFieldErrors({});
+                      setMessage("");
+                    }}
+                  >
+                    <Text>{everyoneSelected ? "Clear selection" : "Select everyone"}</Text>
+                  </Button>
 
                   {unavailableIds.map((id) => (
                     <Button
@@ -603,9 +620,6 @@ export default function CreateExpenseScreen({
 
                   <Text className="text-xs text-muted-foreground">
                     {participantIds.length} selected
-                    {splitType === "EQUAL"
-                      ? " · Shares calculated on save"
-                      : ""}
                   </Text>
                 </View>
 
@@ -642,6 +656,41 @@ export default function CreateExpenseScreen({
                     })}
                   </View>
                 ) : null}
+
+                <View className="gap-3 rounded-[24px] bg-card p-5">
+                  <Text className="font-semibold">Split preview</Text>
+                  {!preview || unavailableIds.length > 0 ? (
+                    <Text className="text-sm text-muted-foreground">
+                      {unavailableIds.length > 0
+                        ? "Remove unavailable participants to preview this split."
+                        : "Enter an amount and select participants to see their shares."}
+                    </Text>
+                  ) : (
+                    <>
+                      {participantIds.map((id, index) => {
+                        const member = members.find(member => member._id === id);
+                        return (
+                          <View key={id} className="flex-row items-center justify-between gap-3">
+                            <Text className="flex-1">{member?.firstName} {member?.lastName}{id === currentUserId ? " (you)" : ""}</Text>
+                            <Text className="font-semibold">
+                              {preview.amounts[index] === null ? "—" : formatShare(preview.amounts[index])}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                      <Text className="text-sm text-muted-foreground" accessibilityLiveRegion="polite">
+                        {splitType === "EQUAL"
+                          ? "Any rounding remainder goes to the first selected participant."
+                          : preview.complete
+                            ? "All shares assigned."
+                            : preview.remaining === 0
+                              ? "Enter a valid share for every selected participant."
+                              : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
+                      </Text>
+                      {splitType === "PERCENTAGE" ? <Text className="text-xs text-muted-foreground">Estimated amounts; the last participant receives any rounding adjustment once percentages total 100%.</Text> : null}
+                    </>
+                  )}
+                </View>
 
                 <DateField
                   label="Expense date"

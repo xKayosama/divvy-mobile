@@ -16,6 +16,9 @@ The mobile client uses `EXPO_PUBLIC_API_URL` and relative paths such as `/auth/l
 
 ## Authentication contract
 
+- Deployment hardening (2026-10-19): registration validates string credentials, nonblank names up to 100 characters each, email syntax/length (254 maximum), and passwords of at least 8 characters and at most 72 UTF-8 bytes before hashing. Invalid input returns 400; duplicate registration races return 409. Emails are trimmed and lowercased. Login rejects malformed/oversized credentials with 400 but still accepts existing shorter passwords. Per-process, per-IP limits over 15 minutes are 20 unsuccessful login attempts and 5 registration requests; excess returns JSON 429 with Retry-After. A shared store or gateway limits and explicit trusted-proxy configuration are required when scaling or hosting behind a proxy.
+- Startup validates MONGO_URI, JWT_SECRET (at least 32 UTF-8 bytes), PORT, and a positive JWT_EXPIRES_IN. `/api/health` remains process liveness; `/api/ready` checks MongoDB connectivity/ping and returns 503 during database failure or shutdown. SIGTERM/SIGINT drains HTTP and closes MongoDB within a 10-second deadline.
+
 Source: `src/modules/auth/auth.routes.js`, `auth.controller.js`, `auth.middleware.js`.
 
 - `POST /api/auth/register`: JSON `{ firstName, lastName, email, password }`. HTTP 201 returns `{ success: true, message, data: { user: { id, firstName, lastName, email } } }`. Registration does not return a token. Missing fields return 400; duplicate email returns 409.
@@ -121,6 +124,8 @@ Source: `src/modules/bills/bill.routes.js`, `bill.controller.js`, `Bill.js`, gro
 - Mobile hides edit/delete on paid bills, blocks direct edit links, and requires deletion confirmation showing name/amount and recurrence effects. Successful changes refresh lists/detail/dashboard; 409 conflicts also refetch these caches so paid bills become locked in the UI. Existing unpaid recurring bills/occurrences can still be marked paid without altering recurrence settings.
 
 ## Expense integration
+
+- Expense-entry improvements (2026-10-19): new manual/receipt expenses default the payer to the signed-in user, while edits retain the original payer and participants. Select everyone/Clear selection operates on active members. Live previews show equal shares with the remainder assigned to the first selected participant, exact amounts with remaining/over-assigned totals, and estimated percentage amounts with the backend's final-participant rounding adjustment when complete. Existing server-side validation and request contracts remain unchanged.
 
 - `GET /api/groups/:id/expenses` returns `data.expenses` and top-level `pagination`; accepts `page`, `limit` (1–100), `search`, `category`, `startDate`, and `endDate` (`YYYY-MM-DD`). Results sort by date and creation time descending.
 - Description search verified on 2026-10-16: `search` is a trimmed, case-insensitive literal substring (maximum 200 characters after trimming). Blank search leaves results unfiltered; non-string or overlong values return HTTP 400. Search combines with group scope, category and date filters for both results and pagination totals. Example: `GET /api/groups/:id/expenses?search=groceries&category=FOOD`. Mobile provides a description search field with a 350 ms debounce, a 200-character limit and a clear action. Search resets pagination to page one, combines with category/date filters, and remains applied during refresh and pagination. Pending searches hide previous results; empty results offer clearing search and filters.

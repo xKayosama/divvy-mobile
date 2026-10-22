@@ -11,7 +11,10 @@
       "icon": {
         "light": "./assets/images/divvy-icon-green.png"
       },
-      "bundleIdentifier": "com.kayosama.divvy-mobile"
+      "bundleIdentifier": "com.kayosama.divvy-mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
