@@ -1,3 +1,4 @@
+import { CategorySelector } from "@/components/ui/category-selector";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { Modal, ScrollView, View } from "react-native";
@@ -5,8 +6,8 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useTheme } from "@/theme/ThemeProvider";
-import { billCategories } from "../billForm";
-import type { BillCategory, GetBillsRequest } from "../types";
+import { billCategoryOptions } from "../billForm";
+import type { GetBillsRequest } from "../types";
 
 export type BillFilters = Pick<GetBillsRequest, "category" | "status" | "isRecurring">;
 
@@ -28,15 +29,7 @@ export default function BillFiltersModal({ filters, onApply, onClose }: {
               </Button>
               <Text accessibilityRole="header" className="flex-1 text-3xl font-semibold">Filter bills</Text>
             </View>
-            <Text className="font-semibold">Category</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {[undefined, ...Object.keys(billCategories) as BillCategory[]].map((category) => (
-                <Button key={category ?? "all"} variant={draft.category === category ? "default" : "outline"} accessibilityState={{ selected: draft.category === category }} onPress={() => setDraft({ ...draft, category })}>
-                  <Ionicons name={category ? billCategories[category] : "grid-outline"} size={18} color={draft.category === category ? colors.primaryForeground : colors.foreground} accessible={false} />
-                  <Text className="capitalize">{category?.toLowerCase() ?? "All categories"}</Text>
-                </Button>
-              ))}
-            </View>
+            <CategorySelector inline value={draft.category} options={billCategoryOptions} onChange={category => setDraft({ ...draft, category })} onClear={() => setDraft({ ...draft, category: undefined })} />
             <Text className="font-semibold">Status</Text>
             <View className="flex-row flex-wrap gap-2">
               {([undefined, "PENDING", "PAID", "OVERDUE"] as const).map((status) => (

@@ -1,6 +1,7 @@
+import { CategorySelector } from "@/components/ui/category-selector";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@/theme/ThemeProvider";
-import { categoryIcons } from "../categoryIcons";
+import { expenseCategoryOptions } from "../categoryIcons";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -15,7 +16,6 @@ import DateField from "@/components/ui/date-field";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import {
-  expenseCategories,
   validateExpenseFilters,
   type ExpenseFilters,
 } from "../filters";
@@ -76,31 +76,7 @@ export default function ExpenseFiltersModal({
                 Filter expenses
               </Text>
             </View>
-            <Text className="font-semibold">Category</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {[undefined, ...expenseCategories].map((value) => (
-                <Button
-                  key={value ?? "all"}
-                  variant={category === value ? "default" : "outline"}
-                  accessibilityState={{ selected: category === value }}
-                  onPress={() => setCategory(value)}
-                >
-                  <Ionicons
-                    name={value ? categoryIcons[value] : "grid-outline"}
-                    size={18}
-                    color={
-                      category === value
-                        ? colors.primaryForeground
-                        : colors.foreground
-                    }
-                    accessible={false}
-                  />
-                  <Text className="capitalize">
-                    {value?.toLowerCase() ?? "All categories"}
-                  </Text>
-                </Button>
-              ))}
-            </View>
+            <CategorySelector inline value={category} options={expenseCategoryOptions} onChange={setCategory} onClear={() => setCategory(undefined)} />
             <DateField
               label="Start date (optional)"
               value={startDate}

@@ -17,3 +17,10 @@ export const categoryIcons: Record<
   SHOPPING: "bag-handle-outline",
   OTHERS: "ellipsis-horizontal-circle-outline",
 };
+
+
+export const expenseCategoryOptions = (Object.keys(categoryIcons) as ExpenseCategory[]).map(value => ({
+  value,
+  label: value === "OTHERS" ? "Other" : value.charAt(0) + value.slice(1).toLowerCase(),
+  icon: categoryIcons[value],
+}));
