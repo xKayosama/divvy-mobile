@@ -15,7 +15,7 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { categoryIcons } from "../categoryIcons";
 import { useDeleteExpenseMutation, useGetExpenseQuery } from "../expensesApi";
 
-const splitLabels = { EQUAL: "Equal split", EXACT: "Exact amounts", PERCENTAGE: "Percentage split", ITEMIZED: "Itemized split" };
+const splitLabels = { EQUAL: "Equal split", SHARES: "By shares", EXACT: "Exact amounts", PERCENTAGE: "Percentage split", ITEMIZED: "Itemized split" };
 
 export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: string; expenseId: string }) {
   const { colors, surfaces } = useTheme();
@@ -112,7 +112,7 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
                 <View key={participant.userId?._id ?? `former-${index}`} className="gap-2 border-t border-border pt-3">
                   <View className="flex-row items-center gap-3">
                     <UserAvatar firstName={participant.userId?.firstName} lastName={participant.userId?.lastName} imageUrl={participant.userId?.avatar} size={34} />
-                    <Text className="flex-1 text-sm">{participant.userId ? `${participant.userId.firstName} ${participant.userId.lastName}` : "Former member"}{participant.percentage != null ? ` (${participant.percentage}%)` : ""}</Text>
+                    <Text className="flex-1 text-sm">{participant.userId ? `${participant.userId.firstName} ${participant.userId.lastName}` : "Former member"}{expense.splitType === "SHARES" && participant.shares != null ? ` (${participant.shares} ${participant.shares === 1 ? "share" : "shares"})` : participant.percentage != null ? ` (${participant.percentage}%)` : ""}</Text>
                   </View>
                   <Text className="ml-12 text-sm font-semibold">{amount(participant.amount)}</Text>
                 </View>

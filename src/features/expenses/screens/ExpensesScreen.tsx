@@ -22,7 +22,7 @@ import ExpenseFiltersModal from "../components/ExpenseFiltersModal";
 import type { ExpenseFilters } from "../filters";
 
 const splitLabels = {
-  EQUAL: "Equal split",
+  EQUAL: "Equal split", SHARES: "By shares",
   ITEMIZED: "Itemized split",
   EXACT: "Exact split",
   PERCENTAGE: "Percentage split",

@@ -34,12 +34,13 @@ export type Expense = {
   amount: number;
   category: ExpenseCategory;
   paidBy: ExpenseUser | null;
-  splitType: "EQUAL" | "EXACT" | "PERCENTAGE" | "ITEMIZED";
+  splitType: "EQUAL" | "EXACT" | "PERCENTAGE" | "ITEMIZED" | "SHARES";
   items?: ExpenseItem[];
   participants: {
     userId: ExpenseUser | null;
     amount: number;
     percentage: number | null;
+    shares?: number | null;
   }[];
   date: string;
   notes: string;
@@ -93,6 +94,10 @@ export type CreateExpenseRequest = ExpenseFields &
     | {
         splitType: "EQUAL";
         participants: { userId: string }[];
+      }
+    | {
+        splitType: "SHARES";
+        participants: { userId: string; shares: number }[];
       }
     | {
         splitType: "EXACT";
