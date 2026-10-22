@@ -1,3 +1,4 @@
+import { CategorySelector } from "@/components/ui/category-selector";
 import { currencyScale, validAmount, formatCurrencyAmount, amountPrecisionLabel } from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
@@ -29,8 +30,7 @@ import {
 import { useTheme } from "@/theme/ThemeProvider";
 import { useAppSelector } from "@/hooks/redux";
 import { splitPreview } from "../splitPreview";
-import { categoryIcons } from "../categoryIcons";
-import { expenseCategories } from "../filters";
+import { expenseCategoryOptions } from "../categoryIcons";
 import {
   useCreateExpenseMutation,
   useUpdateExpenseMutation,
@@ -481,35 +481,7 @@ export default function CreateExpenseScreen({
                   />
                 </View>
 
-                <View className="gap-3">
-                  <Text className="font-semibold">Category</Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {expenseCategories.map((value) => (
-                      <Button
-                        key={value}
-                        variant={category === value ? "default" : "outline"}
-                        className="min-h-12 rounded-full"
-                        disabled={saving}
-                        accessibilityState={{ selected: category === value }}
-                        onPress={() => setCategory(value)}
-                      >
-                        <Ionicons
-                          name={categoryIcons[value]}
-                          size={18}
-                          color={
-                            category === value
-                              ? colors.primaryForeground
-                              : colors.foreground
-                          }
-                          accessible={false}
-                        />
-                        <Text className="capitalize">
-                          {value.toLowerCase()}
-                        </Text>
-                      </Button>
-                    ))}
-                  </View>
-                </View>
+                <CategorySelector value={category} options={expenseCategoryOptions} onChange={setCategory} disabled={saving} />
 
                 <View className="gap-3 rounded-[24px] bg-card p-5">
                   <Text className="font-semibold">Paid by</Text>

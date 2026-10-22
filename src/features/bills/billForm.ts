@@ -40,3 +40,10 @@ export function validateBillFields(
 export function validateBillForm(name: string, amount: string, dueDate: string, currency = "PHP"): string {
   return Object.values(validateBillFields(name, amount, dueDate, currency))[0] ?? "";
 }
+
+
+export const billCategoryOptions = (Object.keys(billCategories) as BillCategory[]).map(value => ({
+  value,
+  label: value.charAt(0) + value.slice(1).toLowerCase(),
+  icon: billCategories[value],
+}));

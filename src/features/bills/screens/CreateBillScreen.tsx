@@ -1,3 +1,4 @@
+import { CategorySelector } from "@/components/ui/category-selector";
 import { formatCurrencyAmount } from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
@@ -14,7 +15,7 @@ import { useRef, useState } from "react";
 import { Keyboard,
   KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { billCategories, validateBillFields } from "../billForm";
+import { billCategoryOptions, validateBillFields } from "../billForm";
 import { useCreateBillMutation, useUpdateBillMutation } from "../billsApi";
 import type {
   Bill,
@@ -184,32 +185,7 @@ export default function CreateBillScreen({
               disabled={saving}
             />
           </View>
-          <View className="gap-3">
-            <Text className="font-semibold">Category</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {(Object.keys(billCategories) as BillCategory[]).map((value) => (
-                <Button
-                  key={value}
-                  variant={category === value ? "default" : "outline"}
-                  disabled={saving}
-                  accessibilityState={{ selected: category === value }}
-                  onPress={() => setCategory(value)}
-                >
-                  <Ionicons
-                    name={billCategories[value]}
-                    size={18}
-                    color={
-                      category === value
-                        ? colors.primaryForeground
-                        : colors.foreground
-                    }
-                    accessible={false}
-                  />
-                  <Text className="capitalize">{value.toLowerCase()}</Text>
-                </Button>
-              ))}
-            </View>
-          </View>
+          <CategorySelector value={category} options={billCategoryOptions} onChange={setCategory} disabled={saving} />
           {bill?.recurrenceSourceId ? (
             <Text className="text-sm text-muted-foreground">
               This is one occurrence of a recurring bill. Changes apply to this
