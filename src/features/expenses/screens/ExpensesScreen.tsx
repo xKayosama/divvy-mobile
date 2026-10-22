@@ -23,6 +23,7 @@ import type { ExpenseFilters } from "../filters";
 
 const splitLabels = {
   EQUAL: "Equal split",
+  ITEMIZED: "Itemized split",
   EXACT: "Exact split",
   PERCENTAGE: "Percentage split",
 };

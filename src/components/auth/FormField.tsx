@@ -26,12 +26,15 @@ export function FormField({ label, icon, password = false, error, inputRef, ...p
       <View
         className={`flex-row items-center rounded-2xl border bg-background pl-4 ${error ? "border-destructive" : focused ? "border-primary" : "border-input"}`}
       >
-        <Ionicons
-          name={icon}
-          size={19}
-          color={colors.mutedForeground}
-          accessible={false}
-        />
+        <View className="h-6 w-6 items-center justify-center">
+          <Ionicons
+            name={icon}
+            size={19}
+            color={colors.mutedForeground}
+            style={{ includeFontPadding: false }}
+            accessible={false}
+          />
+        </View>
         <TextInput
           {...props}
           ref={localRef}
@@ -46,10 +49,16 @@ export function FormField({ label, icon, password = false, error, inputRef, ...p
             props.onBlur?.(event);
           }}
           secureTextEntry={password && !visible}
-          style={[props.style, { borderWidth: 0, borderRadius: 0 }]}
+          style={[
+            // Avoid a forced lineHeight: native single-line inputs use different
+            // baseline metrics from Text and icon fonts.
+            { fontSize: 16, paddingVertical: 0, includeFontPadding: false, textAlignVertical: "center" },
+            props.style,
+            { borderWidth: 0, borderRadius: 0 },
+          ]}
           placeholderTextColor={colors.mutedForeground}
           underlineColorAndroid="transparent"
-          className="h-14 min-w-0 flex-1 bg-transparent px-3 text-base text-foreground outline-none"
+          className="h-14 min-w-0 flex-1 bg-transparent px-3 text-foreground outline-none"
         />
         {password ? (
           <Pressable

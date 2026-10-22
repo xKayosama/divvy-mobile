@@ -15,7 +15,7 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { categoryIcons } from "../categoryIcons";
 import { useDeleteExpenseMutation, useGetExpenseQuery } from "../expensesApi";
 
-const splitLabels = { EQUAL: "Equal split", EXACT: "Exact amounts", PERCENTAGE: "Percentage split" };
+const splitLabels = { EQUAL: "Equal split", EXACT: "Exact amounts", PERCENTAGE: "Percentage split", ITEMIZED: "Itemized split" };
 
 export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: string; expenseId: string }) {
   const { colors, surfaces } = useTheme();
@@ -88,6 +88,21 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
                 </View>
               </View>
             </View>
+            {expense.splitType === "ITEMIZED" ? (
+              <View className="gap-4 rounded-[24px] bg-card p-5" style={surfaces.card}>
+                <Text accessibilityRole="header" className="text-lg font-semibold">Items</Text>
+                {(expense.items ?? []).map((item, index) => (
+                  <View key={index} className="gap-2 border-t border-border pt-3">
+                    <View className="flex-row justify-between gap-3"><Text className="min-w-0 flex-1 font-semibold">{item.description}</Text><Text>{amount(item.amount)}</Text></View>
+                    <Text className="text-sm text-muted-foreground">Quantity: {item.quantity} · Total for this line</Text>
+                    <Text className="text-sm text-muted-foreground">Shared by: {item.memberIds.map(id => {
+                      const person = expense.participants.find(part => part.userId?._id === id)?.userId;
+                      return person ? `${person.firstName} ${person.lastName}` : "Unavailable member";
+                    }).join(", ")}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             <View className="gap-4 rounded-[24px] bg-card p-5" style={surfaces.card}>
               <View className="gap-1">
                 <Text accessibilityRole="header" className="text-lg font-semibold">How it’s split</Text>

@@ -1,3 +1,12 @@
+import { ExpenseMemberSelector } from "../components/ExpenseMemberSelector";
+import { ItemizedExpenseEditor } from "../components/ItemizedExpenseEditor";
+import {
+  emptyItem,
+  existingItemDrafts,
+  receiptItemDrafts,
+  itemizedPreview,
+  type ItemDraft,
+} from "../itemized";
 import { CategorySelector } from "@/components/ui/category-selector";
 import {
   amountPrecisionLabel,
@@ -60,6 +69,16 @@ export default function CreateExpenseScreen({
   const { colors } = useTheme();
   const currentUserId = useAppSelector((state) => state.auth.user?.id);
   const draft = receipt ? receiptDraft(receipt) : undefined;
+  const [mode, setMode] = useState<"STANDARD" | "ITEMIZED">(
+    expense?.splitType === "ITEMIZED" ? "ITEMIZED" : "STANDARD",
+  );
+  const [items, setItems] = useState<ItemDraft[]>(() =>
+    expense?.splitType === "ITEMIZED"
+      ? existingItemDrafts(expense.items ?? [])
+      : receipt?.items.length
+        ? receiptItemDrafts(receipt)
+        : [emptyItem()],
+  );
   const [receiptReviewed, setReceiptReviewed] = useState(false);
   const [description, setDescription] = useState(
     expense?.description ?? draft?.description ?? "",
@@ -77,7 +96,9 @@ export default function CreateExpenseScreen({
     expense?.participants.map((p, i) => p.userId?._id ?? `missing:${i}`) ?? [],
   );
   const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE">(
-    expense?.splitType ?? "EQUAL",
+    expense?.splitType === "ITEMIZED"
+      ? "EQUAL"
+      : (expense?.splitType ?? "EQUAL"),
   );
   const [shares, setShares] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -96,6 +117,8 @@ export default function CreateExpenseScreen({
   });
   const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
   const snapshot = JSON.stringify({
+    mode,
+    items,
     description,
     amount,
     category,
@@ -149,21 +172,6 @@ export default function CreateExpenseScreen({
   const scale = currencyScale(group?.currency);
   const formatShare = (value: number) =>
     `${group?.currency ?? ""} ${formatCurrencyAmount(value / scale, group?.currency)}`.trim();
-  const everyoneSelected =
-    members.length > 0 &&
-    members.every((member) => participantIds.includes(member._id)) &&
-    unavailableIds.length === 0;
-
-  function toggleParticipant(id: string) {
-    setMessage("");
-    setFieldErrors({});
-    setParticipantIds((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id],
-    );
-  }
-
   const unsaved = useUnsavedChanges(
     !!receipt || snapshot !== initialSnapshot,
     saving,
@@ -223,8 +231,11 @@ export default function CreateExpenseScreen({
     }
 
     if (
-      participantIds.length === 0 ||
-      participantIds.some((id) => !members.some((member) => member._id === id))
+      mode === "STANDARD" &&
+      (participantIds.length === 0 ||
+        participantIds.some(
+          (id) => !members.some((member) => member._id === id),
+        ))
     ) {
       fieldError(
         "participants",
@@ -258,7 +269,19 @@ export default function CreateExpenseScreen({
       notes: notes.trim(),
     };
     let body: CreateExpenseRequest;
-    if (splitType === "EQUAL") {
+    if (mode === "ITEMIZED") {
+      const result = itemizedPreview(
+        items,
+        normalizedAmount,
+        group.currency,
+        members.map((member) => member._id),
+      );
+      if (result.error || !result.items) {
+        fieldError("items", result.error || "Review the itemized split.");
+        return;
+      }
+      body = { ...fields, splitType: "ITEMIZED", items: result.items };
+    } else if (splitType === "EQUAL") {
       body = {
         ...fields,
         splitType,
@@ -509,6 +532,62 @@ export default function CreateExpenseScreen({
               </View>
             ) : (
               <>
+                <View className="gap-3">
+                  <Text className="font-semibold">Expense type</Text>
+                  <View className="flex-row gap-3">
+                    {(["STANDARD", "ITEMIZED"] as const).map((value) => (
+                      <Button
+                        key={value}
+                        className="min-h-14 flex-1"
+                        variant={mode === value ? "default" : "outline"}
+                        disabled={saving}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: mode === value }}
+                        onPress={() => {
+                          setMode(value);
+                          setMessage("");
+                          setFieldErrors({});
+                        }}
+                      >
+                        <Ionicons
+                          name={
+                            value === "STANDARD"
+                              ? "receipt-outline"
+                              : "list-outline"
+                          }
+                          size={20}
+                          color={
+                            mode === value
+                              ? colors.primaryForeground
+                              : colors.primary
+                          }
+                          accessible={false}
+                        />
+                        <Text>
+                          {value === "STANDARD" ? "Standard" : "Itemized"}
+                        </Text>
+                      </Button>
+                    ))}
+                  </View>
+                  <Text className="text-sm text-muted-foreground">
+                    {mode === "STANDARD"
+                      ? "Split one total equally, by exact amounts, or by percentage."
+                      : "Assign each item to the people who share it. Switching modes keeps your draft entries until you save."}
+                  </Text>
+                  {expense?.splitType === "ITEMIZED" && mode === "STANDARD" ? (
+                    <Text className="text-sm text-muted-foreground">
+                      Saving as Standard removes the saved item breakdown and
+                      uses the split below.
+                    </Text>
+                  ) : null}
+                  {receipt?.items.length ? (
+                    <Text className="text-sm text-muted-foreground">
+                      {receipt.items.length} receipt items are ready in
+                      Itemized. Check every description, quantity, line total
+                      and assignment before saving.
+                    </Text>
+                  ) : null}
+                </View>
                 <View className="gap-5 rounded-[24px] bg-card p-5">
                   <FormField
                     label="Description"
@@ -551,227 +630,198 @@ export default function CreateExpenseScreen({
                   disabled={saving}
                 />
 
-                <View className="gap-3 rounded-[24px] bg-card p-5">
-                  <Text className="font-semibold">Paid by</Text>
-                  <FormMessage message={fieldErrors.paidBy ?? ""} />
-                  {expense &&
-                  !members.some((member) => member._id === paidBy) ? (
-                    <Text className="text-sm text-muted-foreground">
-                      The original payer is unavailable. Choose an active
-                      member.
-                    </Text>
-                  ) : null}
-                  {members.map((member) => (
-                    <Button
-                      key={member._id}
-                      variant={paidBy === member._id ? "default" : "outline"}
-                      className="min-h-12 h-auto rounded-2xl py-3"
-                      disabled={saving}
-                      accessibilityState={{ selected: paidBy === member._id }}
-                      onPress={() => {
-                        setPaidBy(member._id);
+                <ExpenseMemberSelector
+                  mode="single"
+                  value={paidBy}
+                  members={members}
+                  currentUserId={currentUserId}
+                  disabled={saving}
+                  error={fieldErrors.paidBy}
+                  onChange={(id) => {
+                    setPaidBy(id);
+                    setFieldErrors({});
+                    setMessage("");
+                  }}
+                />
+
+                {mode === "ITEMIZED" ? (
+                  <>
+                    <FormMessage message={fieldErrors.items ?? ""} />
+                    <ItemizedExpenseEditor
+                      items={items}
+                      onChange={(value) => {
+                        setItems(value);
                         setFieldErrors({});
                         setMessage("");
                       }}
-                    >
-                      <Text>
-                        {member.firstName} {member.lastName}
-                      </Text>
-                    </Button>
-                  ))}
-                </View>
-
-                <View className="gap-3 rounded-[24px] bg-card p-5">
-                  <Text className="font-semibold">Split between</Text>
-                  <FormMessage
-                    message={
-                      fieldErrors.participants ?? fieldErrors.shares ?? ""
-                    }
-                  />
-                  <View className="flex-row flex-wrap gap-2">
-                    {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
-                      (value) => (
-                        <Button
-                          key={value}
-                          variant={splitType === value ? "default" : "outline"}
-                          className="min-h-12 h-auto grow rounded-2xl px-4 py-3"
-                          disabled={saving}
-                          accessibilityState={{ selected: splitType === value }}
-                          onPress={() => {
-                            if (value !== splitType) setShares({});
-                            setSplitType(value);
-                            setMessage("");
-                          }}
-                        >
-                          <Text className="text-sm font-semibold">
-                            {value === "EQUAL"
-                              ? "Equally"
-                              : value === "EXACT"
-                                ? "By amount"
-                                : "By percent"}
-                          </Text>
-                        </Button>
-                      ),
-                    )}
-                  </View>
-                  <Text className="text-sm text-muted-foreground">
-                    Select everyone sharing this expense.
-                  </Text>
-                  <Button
-                    variant="outline"
-                    disabled={saving || members.length === 0}
-                    onPress={() => {
-                      setParticipantIds(
-                        everyoneSelected
-                          ? []
-                          : members.map((member) => member._id),
-                      );
-                      setFieldErrors({});
-                      setMessage("");
-                    }}
-                  >
-                    <Text>
-                      {everyoneSelected ? "Clear selection" : "Select everyone"}
-                    </Text>
-                  </Button>
-
-                  {unavailableIds.map((id) => (
-                    <Button
-                      key={id}
-                      variant="outline"
+                      members={members}
+                      amount={amount}
+                      currency={group?.currency ?? "PHP"}
                       disabled={saving}
-                      onPress={() => toggleParticipant(id)}
-                    >
-                      <Text>Remove unavailable participant</Text>
-                    </Button>
-                  ))}
-                  {members.map((member) => {
-                    const selected = participantIds.includes(member._id);
-
-                    return (
-                      <Button
-                        key={member._id}
-                        variant={selected ? "secondary" : "outline"}
-                        className="min-h-12 h-auto rounded-2xl py-3"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <View className="gap-3 rounded-[24px] bg-card p-5">
+                      <ExpenseMemberSelector
+                        mode="multiple"
+                        value={participantIds}
+                        members={members}
+                        currentUserId={currentUserId}
                         disabled={saving}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: selected }}
-                        onPress={() => toggleParticipant(member._id)}
-                      >
-                        {selected ? (
-                          <Ionicons
-                            name="checkmark"
-                            size={20}
-                            color={colors.secondaryForeground}
-                            accessible={false}
-                          />
-                        ) : null}
-                        <Text>
-                          {member.firstName} {member.lastName}
-                        </Text>
-                      </Button>
-                    );
-                  })}
-
-                  <Text className="text-xs text-muted-foreground">
-                    {participantIds.length} selected
-                  </Text>
-                </View>
-
-                {splitType !== "EQUAL" ? (
-                  <View className="gap-4 rounded-[24px] bg-card p-5">
-                    <Text className="font-semibold">
-                      {splitType === "EXACT"
-                        ? "Member amounts"
-                        : "Member percentages"}
-                    </Text>
-                    <Text className="text-sm text-muted-foreground">
-                      {splitType === "EXACT"
-                        ? "Amounts must add up to the expense total."
-                        : "Percentages must add up to 100%."}
-                    </Text>
-                    {participantIds.map((id) => {
-                      const member = members.find((value) => value._id === id);
-                      return (
-                        <FormField
-                          key={id}
-                          label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
-                          icon="cash-outline"
-                          keyboardType="decimal-pad"
-                          placeholder={formatCurrencyAmount(
-                            0,
-                            splitType === "PERCENTAGE"
-                              ? "PHP"
-                              : group?.currency,
-                          )}
-                          value={shares[id] ?? ""}
-                          editable={!saving}
-                          onChangeText={(value) => {
-                            setFieldErrors({});
-                            setMessage("");
-                            setShares((current) => ({
-                              ...current,
-                              [id]: value,
-                            }));
-                          }}
-                        />
-                      );
-                    })}
-                  </View>
-                ) : null}
-
-                <View className="gap-3 rounded-[24px] bg-card p-5">
-                  <Text className="font-semibold">Split preview</Text>
-                  {!preview || unavailableIds.length > 0 ? (
-                    <Text className="text-sm text-muted-foreground">
-                      {unavailableIds.length > 0
-                        ? "Remove unavailable participants to preview this split."
-                        : "Enter an amount and select participants to see their shares."}
-                    </Text>
-                  ) : (
-                    <>
-                      {participantIds.map((id, index) => {
-                        const member = members.find(
-                          (member) => member._id === id,
-                        );
-                        return (
-                          <View
-                            key={id}
-                            className="flex-row items-center justify-between gap-3"
-                          >
-                            <Text className="flex-1">
-                              {member?.firstName} {member?.lastName}
-                              {id === currentUserId ? " (you)" : ""}
-                            </Text>
-                            <Text className="font-semibold">
-                              {preview.amounts[index] === null
-                                ? "—"
-                                : formatShare(preview.amounts[index])}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                      <Text
-                        className="text-sm text-muted-foreground"
-                        accessibilityLiveRegion="polite"
-                      >
-                        {splitType === "EQUAL"
-                          ? "Any rounding remainder goes to the first selected participant."
-                          : preview.complete
-                            ? "All shares assigned."
-                            : preview.remaining === 0
-                              ? "Enter a valid share for every selected participant."
-                              : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
+                        error={fieldErrors.participants ?? fieldErrors.shares}
+                        onChange={(ids) => {
+                          setParticipantIds(ids);
+                          setFieldErrors({});
+                          setMessage("");
+                        }}
+                      />
+                      <Text className="text-sm font-semibold">
+                        How to split
                       </Text>
-                      {splitType === "PERCENTAGE" ? (
-                        <Text className="text-xs text-muted-foreground">
-                          Estimated amounts; rounding is reconciled to the
-                          expense total once percentages reach 100%.
+                      <View className="flex-row flex-wrap gap-2">
+                        {(["EQUAL", "EXACT", "PERCENTAGE"] as const).map(
+                          (value) => (
+                            <Button
+                              key={value}
+                              variant={
+                                splitType === value ? "default" : "outline"
+                              }
+                              className="min-h-12 h-auto grow rounded-2xl px-4 py-3"
+                              disabled={saving}
+                              accessibilityState={{
+                                selected: splitType === value,
+                              }}
+                              onPress={() => {
+                                if (value !== splitType) setShares({});
+                                setSplitType(value);
+                                setMessage("");
+                              }}
+                            >
+                              <Ionicons
+                                name={value === "EQUAL" ? "people-outline" : value === "EXACT" ? "cash-outline" : "pie-chart-outline"}
+                                size={20}
+                                color={splitType === value ? colors.primaryForeground : colors.primary}
+                                accessible={false}
+                              />
+                              <Text className="text-sm font-semibold">
+                                {value === "EQUAL"
+                                  ? "Equally"
+                                  : value === "EXACT"
+                                    ? "By amount"
+                                    : "By percent"}
+                              </Text>
+                            </Button>
+                          ),
+                        )}
+                      </View>
+                      <Text className="text-sm text-muted-foreground">
+                        {splitType === "EQUAL"
+                          ? "Share the total equally between selected members. See each person’s amount below."
+                          : splitType === "EXACT"
+                            ? "Enter the amount each selected member owes. The amounts must match the total."
+                            : "Enter each selected member’s percentage. Percentages must add up to 100%."}
+                      </Text>
+                    </View>
+
+                    {splitType !== "EQUAL" ? (
+                      <View className="gap-4 rounded-[24px] bg-card p-5">
+                        <Text className="font-semibold">
+                          {splitType === "EXACT"
+                            ? "Member amounts"
+                            : "Member percentages"}
                         </Text>
-                      ) : null}
-                    </>
-                  )}
-                </View>
+                        <Text className="text-sm text-muted-foreground">
+                          {splitType === "EXACT"
+                            ? "Amounts must add up to the expense total."
+                            : "Percentages must add up to 100%."}
+                        </Text>
+                        {participantIds.map((id) => {
+                          const member = members.find(
+                            (value) => value._id === id,
+                          );
+                          return (
+                            <FormField
+                              key={id}
+                              label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
+                              icon="cash-outline"
+                              keyboardType="decimal-pad"
+                              placeholder={formatCurrencyAmount(
+                                0,
+                                splitType === "PERCENTAGE"
+                                  ? "PHP"
+                                  : group?.currency,
+                              )}
+                              value={shares[id] ?? ""}
+                              editable={!saving}
+                              onChangeText={(value) => {
+                                setFieldErrors({});
+                                setMessage("");
+                                setShares((current) => ({
+                                  ...current,
+                                  [id]: value,
+                                }));
+                              }}
+                            />
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    <View className="gap-3 rounded-[24px] bg-card p-5">
+                      <Text className="font-semibold">Split preview</Text>
+                      {!preview || unavailableIds.length > 0 ? (
+                        <Text className="text-sm text-muted-foreground">
+                          {unavailableIds.length > 0
+                            ? "Remove unavailable participants to preview this split."
+                            : "Enter an amount and select participants to see their shares."}
+                        </Text>
+                      ) : (
+                        <>
+                          {participantIds.map((id, index) => {
+                            const member = members.find(
+                              (member) => member._id === id,
+                            );
+                            return (
+                              <View
+                                key={id}
+                                className="flex-row items-center justify-between gap-3"
+                              >
+                                <Text className="flex-1">
+                                  {member?.firstName} {member?.lastName}
+                                  {id === currentUserId ? " (you)" : ""}
+                                </Text>
+                                <Text className="font-semibold">
+                                  {preview.amounts[index] === null
+                                    ? "—"
+                                    : formatShare(preview.amounts[index])}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                          <Text
+                            className="text-sm text-muted-foreground"
+                            accessibilityLiveRegion="polite"
+                          >
+                            {splitType === "EQUAL"
+                              ? "Any rounding remainder goes to the first selected participant."
+                              : preview.complete
+                                ? "All shares assigned."
+                                : preview.remaining === 0
+                                  ? "Enter a valid share for every selected participant."
+                                  : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
+                          </Text>
+                          {splitType === "PERCENTAGE" ? (
+                            <Text className="text-xs text-muted-foreground">
+                              Estimated amounts; rounding is reconciled to the
+                              expense total once percentages reach 100%.
+                            </Text>
+                          ) : null}
+                        </>
+                      )}
+                    </View>
+                  </>
+                )}
 
                 <DateField
                   label="Expense date"
