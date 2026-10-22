@@ -3,7 +3,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 ## Backend context
 
 Before implementing authentication or backend integration, read `docs/backend.md`.
-The local backend is `/Users/m2/household-expense-tracker-backend`.
+The local backend is `/Users/m2/divvy-backend`.
 Verify contracts against its current routes/controllers before changing the mobile client, and update the context document when contracts change.
 
 ## Expo has changed — do not trust your training data

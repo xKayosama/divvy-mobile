@@ -22,7 +22,7 @@ Use the [SDK 57 reference](https://docs.expo.dev/versions/v57.0.0/) for Expo and
 ## Local setup
 
 1. Install compatible Node.js and npm, then run `npm ci` from this repository.
-2. Set up the backend separately. Its local path is `/Users/m2/household-expense-tracker-backend`. Follow its README for MongoDB, environment variables, and installation, then run `npm run dev` there.
+2. Set up the backend separately. Its local path is `/Users/m2/divvy-backend`. Follow its README for MongoDB, environment variables, and installation, then run `npm run dev` there.
 3. Create `.env.local` in the mobile repository:
 
    ```dotenv

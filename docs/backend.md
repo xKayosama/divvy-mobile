@@ -4,7 +4,7 @@ Authentication verified from local backend source on 2026-10-06; expense creatio
 
 ## Location and stack
 
-- Backend: `/Users/m2/household-expense-tracker-backend`
+- Backend: `/Users/m2/divvy-backend`
 - Repository: https://github.com/xKayosama/household-expense-tracker-backend
 - Express 5, MongoDB/Mongoose, CommonJS JavaScript.
 - Entry points: `server.js` and `src/app.js`; feature code lives in `src/modules/`.
