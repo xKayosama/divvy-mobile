@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { ListSortControl } from "@/components/ui/list-sort-control";
 import type { ExpenseSort } from "../types";
@@ -102,10 +103,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
   const hasCriteria = hasFilters || !!search;
 
   function formatAmount(amount: number) {
-    return new Intl.NumberFormat("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyAmount(amount, group?.currency);
   }
 
   return (

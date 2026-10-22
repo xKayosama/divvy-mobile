@@ -1,3 +1,4 @@
+import { resolveGroupIcon } from "@/features/groups/groupIcons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, View } from "react-native";
 
@@ -9,12 +10,14 @@ import { useTheme } from "@/theme/ThemeProvider";
 type Props = {
   groupName: string;
   currency?: string;
+  groupIcon?: string;
   onSwitchGroup: () => void;
   onOpenProfile: () => void;
 };
 
 export default function DashboardHeader({
   groupName,
+  groupIcon,
   currency,
   onSwitchGroup,
   onOpenProfile,
@@ -42,7 +45,7 @@ export default function DashboardHeader({
         style={{ boxShadow: surfaces.card.boxShadow }}
       >
         <Ionicons
-          name="people-outline"
+          name={resolveGroupIcon(groupIcon).glyph}
           size={18}
           color={colors.primary}
           accessible={false}

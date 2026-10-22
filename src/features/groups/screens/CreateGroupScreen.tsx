@@ -1,3 +1,5 @@
+import { GroupIconSelector } from "../components/GroupIconSelector";
+import { defaultGroupIcon, type GroupIcon } from "../groupIcons";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
@@ -9,9 +11,13 @@ import { authError } from "@/features/auth/errors";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useCreateGroupMutation } from "../groupsApi";
+import { CurrencySelector } from "../components/CurrencySelector";
+import type { GroupCurrency } from "../currencies";
 
 export default function CreateGroupScreen() {
+  const [icon, setIcon] = useState<GroupIcon>(defaultGroupIcon);
   const [name, setName] = useState("");
+  const [currency, setCurrency] = useState<GroupCurrency>("PHP");
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   function fieldError(field: string, text: string) {
@@ -22,7 +28,7 @@ export default function CreateGroupScreen() {
   const [createGroup, { isLoading }] = useCreateGroupMutation();
   const submitting = useRef(false);
 
-  const unsaved = useUnsavedChanges(!!name.trim(), isLoading);
+  const unsaved = useUnsavedChanges(!!name.trim() || currency !== "PHP" || icon !== defaultGroupIcon, isLoading);
 
   async function handleCreate() {
     if (submitting.current) return;
@@ -39,7 +45,7 @@ export default function CreateGroupScreen() {
     setMessage("");
 
     try {
-      await createGroup({ name: trimmedName }).unwrap();
+      await createGroup({ name: trimmedName, currency, icon }).unwrap();
       unsaved.complete(() => router.replace("/groups"));
     } catch (error) {
       setMessage(authError(error, "Could not create the group. Please try again."));
@@ -82,9 +88,9 @@ export default function CreateGroupScreen() {
             onSubmitEditing={handleCreate}
           />
 
-          <Text className="text-sm text-muted-foreground">
-            Currency: PHP
-          </Text>
+          <GroupIconSelector value={icon} onChange={setIcon} disabled={isLoading} />
+
+          <CurrencySelector value={currency} onChange={setCurrency} disabled={isLoading} />
 
           <FormMessage message={message} />
 

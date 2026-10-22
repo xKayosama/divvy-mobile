@@ -1525,9 +1525,56 @@ test("bill field validation identifies each invalid field and rejects unsafe amo
   const { validateBillFields } = require("../src/features/bills/billForm.ts");
   assert.deepEqual(validateBillFields(" ", "0", "2026-02-30"), {
     name: "Enter a bill name.",
-    amount: "Enter an amount greater than zero, with up to two decimals.",
+    amount: "Enter an amount greater than zero, with up to 2 decimal places.",
     dueDate: "Enter a valid due date in YYYY-MM-DD format.",
   });
   assert.ok(validateBillFields("Rent", "9007199254740991", "2026-10-16").amount);
   assert.deepEqual(validateBillFields("Rent", "12.50", "2028-02-29"), {});
+});
+
+
+test("group creation and settings submit the selected icon", async () => {
+  signedIn();
+  const requests = [];
+  global.fetch = async request => {
+    if (request.method === "GET") return respond(200, { success: true, data: { groups: [] } });
+    const body = await request.json();
+    requests.push({ method: request.method, body });
+    return respond(request.method === "POST" ? 201 : 200, { success: true, data: { group: { _id: "g1", ...body } } });
+  };
+  await store.dispatch(groupsApi.endpoints.createGroup.initiate({ name: "Trip", currency: "JPY", icon: "airplane" })).unwrap();
+  await store.dispatch(groupsApi.endpoints.renameGroup.initiate({ groupId: "g1", name: " Our trip ", icon: "car" })).unwrap();
+  assert.deepEqual(requests, [
+    { method: "POST", body: { name: "Trip", currency: "JPY", icon: "airplane" } },
+    { method: "PUT", body: { name: "Our trip", icon: "car" } },
+  ]);
+});
+
+
+test("group settings load server currency eligibility and submit the selected currency", async () => {
+  signedIn();
+  let currency = "PHP";
+  let locked = false;
+  const writes = [];
+  global.fetch = async request => {
+    if (request.method === "PUT") {
+      const body = await request.json(); writes.push(body);
+      if (locked) return respond(409, { success: false, message: "Currency cannot change after expenses, bills or payments have been recorded." });
+      currency = body.currency;
+      return respond(200, { success: true, data: { group: { _id: "gCurrency", currency } } });
+    }
+    return respond(200, { success: true, data: { group: { id: "gCurrency", name: "Home", currency, canChangeCurrency: !locked } } });
+  };
+  const query = store.dispatch(groupsApi.endpoints.getGroupDetails.initiate("gCurrency"));
+  try {
+    assert.equal((await query.unwrap()).data.group.canChangeCurrency, true);
+    await store.dispatch(groupsApi.endpoints.renameGroup.initiate({ groupId: "gCurrency", name: "Home", currency: "JPY" })).unwrap();
+    await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query => query.unwrap()));
+    assert.equal(groupsApi.endpoints.getGroupDetails.select("gCurrency")(store.getState()).data.data.group.currency, "JPY");
+    locked = true;
+    await assert.rejects(store.dispatch(groupsApi.endpoints.renameGroup.initiate({ groupId: "gCurrency", name: "Home", currency: "KWD" })).unwrap(), error => error.status === 409);
+    assert.equal(currency, "JPY");
+    assert.equal((await query.refetch().unwrap()).data.group.canChangeCurrency, false);
+    assert.deepEqual(writes, [{ name: "Home", currency: "JPY" }, { name: "Home", currency: "KWD" }]);
+  } finally { query.unsubscribe(); }
 });

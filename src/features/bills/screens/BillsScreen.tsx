@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { ListSortControl } from "@/components/ui/list-sort-control";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
@@ -102,10 +103,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
   const pagination = currentData?.pagination;
 
   function formatAmount(amount: number) {
-    return new Intl.NumberFormat("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyAmount(amount, group?.currency);
   }
 
   function refresh() {

@@ -1,9 +1,12 @@
+import type { GroupCurrency } from "./currencies";
+import type { GroupIcon } from "./groupIcons";
 import { api } from "@/services/api";
 import type {
   CreateGroupRequest,
   CreateGroupResponse,
   GroupMembersResponse,
   GroupsResponse,
+  GroupDetailsResponse,
   AddGroupMemberResponse,
 } from "./types";
 
@@ -11,16 +14,20 @@ export const groupsApi = api
   .enhanceEndpoints({ addTagTypes: ["Groups", "Dashboard"] })
   .injectEndpoints({
     endpoints: (builder) => ({
+      getGroupDetails: builder.query<GroupDetailsResponse, string>({
+        query: (groupId) => `/groups/${encodeURIComponent(groupId)}`,
+        providesTags: ["Groups"],
+      }),
       renameGroup: builder.mutation<
         CreateGroupResponse,
-        { groupId: string; name: string }
+        { groupId: string; name: string; icon?: GroupIcon; currency?: GroupCurrency }
       >({
-        query: ({ groupId, name }) => ({
+        query: ({ groupId, name, icon, currency }) => ({
           url: `/groups/${encodeURIComponent(groupId)}`,
           method: "PUT",
-          body: { name: name.trim() },
+          body: { name: name.trim(), ...(icon !== undefined ? { icon } : {}), ...(currency !== undefined ? { currency } : {}) },
         }),
-        invalidatesTags: (_result, error) => (error ? [] : ["Groups"]),
+        invalidatesTags: (_result, error, { groupId, currency }) => error ? [] : ["Groups", ...(currency !== undefined ? [{ type: "Dashboard" as const, id: groupId }] : [])],
       }),
       removeGroupMember: builder.mutation<
         { success: true; message: string },
@@ -68,6 +75,7 @@ export const groupsApi = api
 
 export const {
   useGetMyGroupsQuery,
+  useGetGroupDetailsQuery,
   useCreateGroupMutation,
   useGetGroupMembersQuery,
   useAddGroupMemberMutation,

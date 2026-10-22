@@ -1,15 +1,17 @@
+import { currencyDigits } from "../groups/money";
 import type { ReceiptExtraction } from "./types";
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 export function receiptDraft(receipt: ReceiptExtraction) {
   const parsed = receipt.date ? new Date(`${receipt.date}T00:00:00Z`) : null;
+  // Preserve excess extracted decimals so the form asks for correction rather than rounding.
+  const total = receipt.total;
+  const text = String(total);
+  const amount = total != null && Number.isFinite(total) && total > 0
+    ? text.includes("e") ? text : total.toFixed(Math.max(currencyDigits(receipt.currency), text.split(".")[1]?.length ?? 0))
+    : "";
   return {
     description: receipt.merchant?.trim() ?? "",
-    amount:
-      receipt.total != null &&
-      Number.isFinite(receipt.total) &&
-      receipt.total > 0
-        ? receipt.total.toFixed(2)
-        : "",
+    amount,
     date:
       parsed &&
       Number.isFinite(parsed.getTime()) &&

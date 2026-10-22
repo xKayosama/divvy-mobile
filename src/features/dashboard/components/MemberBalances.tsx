@@ -37,7 +37,7 @@ export default function MemberBalances({
         </Text>
       ) : (
         balances.map((balance, index) => {
-          const net = Math.round(balance.net * 100) / 100;
+          const net = balance.net;
           const receiving = net > 0;
           const owing = net < 0;
 
