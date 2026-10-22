@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, View } from "react-native";
@@ -106,10 +107,7 @@ export default function PayBillScreen({
               <Text className="text-lg font-semibold">{bill.name}</Text>
               <Text className="text-3xl font-semibold">
                 {currency ? `${currency} ` : ""}
-                {new Intl.NumberFormat("en-PH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }).format(bill.amount)}
+                {formatCurrencyAmount(bill.amount, currency)}
               </Text>
               <Text className="text-sm text-muted-foreground">
                 Due{" "}

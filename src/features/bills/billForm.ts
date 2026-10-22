@@ -1,3 +1,4 @@
+import { validAmount, amountPrecisionLabel } from "../groups/money";
 import type Ionicons from "@expo/vector-icons/Ionicons";
 import type { ComponentProps } from "react";
 import type { BillCategory } from "./types";
@@ -20,16 +21,12 @@ export function validateBillFields(
   name: string,
   amount: string,
   dueDate: string,
+  currency = "PHP",
 ): Partial<Record<"name" | "amount" | "dueDate", string>> {
   const errors: Partial<Record<"name" | "amount" | "dueDate", string>> = {};
   if (!name.trim()) errors.name = "Enter a bill name.";
-  if (
-    !/^\d+(\.\d{1,2})?$/.test(amount) ||
-    !Number.isFinite(Number(amount)) ||
-    Number(amount) <= 0 ||
-    !Number.isSafeInteger(Math.round(Number(amount) * 100))
-  )
-    errors.amount = "Enter an amount greater than zero, with up to two decimals.";
+  if (!validAmount(amount, currency))
+    errors.amount = `Enter an amount greater than zero, with ${amountPrecisionLabel(currency)}.`;
   const parsed = new Date(`${dueDate}T00:00:00.000Z`);
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) ||
@@ -40,6 +37,6 @@ export function validateBillFields(
   return errors;
 }
 
-export function validateBillForm(name: string, amount: string, dueDate: string): string {
-  return Object.values(validateBillFields(name, amount, dueDate))[0] ?? "";
+export function validateBillForm(name: string, amount: string, dueDate: string, currency = "PHP"): string {
+  return Object.values(validateBillFields(name, amount, dueDate, currency))[0] ?? "";
 }

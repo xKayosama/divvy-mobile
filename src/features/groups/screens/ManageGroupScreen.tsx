@@ -1,3 +1,7 @@
+import { CurrencySelector } from "../components/CurrencySelector";
+import type { GroupCurrency } from "../currencies";
+import { GroupIconSelector } from "../components/GroupIconSelector";
+import { resolveGroupIcon, type GroupIcon } from "../groupIcons";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -22,6 +26,7 @@ import { useAppSelector } from "@/hooks/redux";
 import {
   useGetGroupMembersQuery,
   useGetMyGroupsQuery,
+  useGetGroupDetailsQuery,
   useRemoveGroupMemberMutation,
   useRenameGroupMutation,
 } from "../groupsApi";
@@ -45,6 +50,14 @@ export default function ManageGroupScreen({
   const group = groupsQuery.currentData?.data.groups.find(
     (item) => item.id === groupId,
   );
+  const currencyQuery = useGetGroupDetailsQuery(groupId, {
+    skip: !!memberUserId,
+    refetchOnMountOrArgChange: true,
+  });
+  const canChangeCurrency = !currencyQuery.isError && !currencyQuery.isFetching &&
+    currencyQuery.currentData?.data.group.canChangeCurrency === true;
+  const [currency, setCurrency] = useState<GroupCurrency | undefined>();
+  const currencyChanged = currency !== undefined && currency !== group?.currency;
   const members = membersQuery.currentData?.data.members ?? [];
   const isOwner = members.some(
     (item) =>
@@ -62,6 +75,7 @@ export default function ManageGroupScreen({
     : groupsQuery.isError
       ? groupsQuery.error
       : undefined;
+  const [icon, setIcon] = useState<GroupIcon | undefined>();
   const [name, setName] = useState<string | undefined>();
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -76,7 +90,7 @@ export default function ManageGroupScreen({
     useRemoveGroupMemberMutation();
   const [renameGroup, { isLoading: renaming }] = useRenameGroupMutation();
   const saving = removing || renaming;
-  const unsaved = useUnsavedChanges(!done && !memberUserId && name !== undefined && name !== group?.name, saving);
+  const unsaved = useUnsavedChanges(!done && !memberUserId && (currencyChanged || (name !== undefined && name !== group?.name) || (icon !== undefined && icon !== resolveGroupIcon(group?.icon).value)), saving);
 
   function back() {
     unsaved.requestLeave(() => router.navigate({
@@ -92,6 +106,10 @@ export default function ManageGroupScreen({
       fieldError("name", "Enter a group name.");
       return;
     }
+    if (!memberUserId && currencyChanged && !canChangeCurrency) {
+      setMessage("Currency can only change before any expenses, bills or payments are recorded. Check the currency status below.");
+      return;
+    }
     Keyboard.dismiss();
     submitting.current = true;
     setMessage("");
@@ -100,15 +118,19 @@ export default function ManageGroupScreen({
         const removed = target?.userId ?? null;
         await removeMember({ groupId, userId: memberUserId }).unwrap();
         setRemovedUser(removed);
-      } else await renameGroup({ groupId, name: nextName }).unwrap();
+      } else await renameGroup({ groupId, name: nextName, ...(icon !== undefined ? { icon } : {}), ...(currencyChanged ? { currency } : {}) }).unwrap();
       setDone(true);
     } catch (error) {
+      if (currencyChanged && error && typeof error === "object" && "status" in error && error.status === 409) {
+        setCurrency(undefined);
+        void currencyQuery.refetch();
+      }
       setMessage(
         authError(
           error,
           memberUserId
             ? "Could not remove this member. Try again."
-            : "Could not rename this group. Try again.",
+            : "Could not update this group. Try again.",
         ),
       );
     } finally {
@@ -182,7 +204,7 @@ export default function ManageGroupScreen({
                 <Text className="text-center text-base leading-6 text-muted-foreground">
                   {memberUserId
                     ? `${removedUser?.firstName ?? "This member"} no longer has access to your group.`
-                    : "Your new group name is ready for everyone."}
+                    : "Your group settings are ready for everyone."}
                 </Text>
               </View>
               {memberUserId && removedUser ? (
@@ -321,9 +343,29 @@ export default function ManageGroupScreen({
                     editable={!saving}
                     autoCapitalize="words"
                   />
-                  <Text className="text-sm text-muted-foreground">
-                    Currency: {group.currency}
-                  </Text>
+                  <GroupIconSelector value={icon ?? resolveGroupIcon(group.icon).value} onChange={setIcon} disabled={saving} />
+                  <CurrencySelector
+                    value={currency ?? group.currency}
+                    onChange={value => { setCurrency(value); setMessage(""); }}
+                    disabled={saving || !canChangeCurrency}
+                  />
+                  <View className="gap-2">
+                    <Text className="text-sm text-muted-foreground" accessibilityLiveRegion="polite">
+                      {currencyQuery.isFetching
+                        ? "Checking whether the currency can be changed…"
+                        : currencyQuery.isError || currencyQuery.currentData?.data.group.canChangeCurrency === undefined
+                          ? "Could not check whether the currency can be changed. Try again."
+                          : canChangeCurrency
+                            ? "You can change currency until the first expense, bill or payment is recorded."
+                            : "Currency is locked because this group has recorded expenses, bills or payments."}
+                    </Text>
+                    {currencyQuery.isError || (!currencyQuery.isFetching && currencyQuery.currentData?.data.group.canChangeCurrency === undefined) ? (
+                      <Button variant="outline" disabled={currencyQuery.isFetching} onPress={() => void currencyQuery.refetch()}><Text>Check currency status</Text></Button>
+                    ) : null}
+                    {currencyChanged && !canChangeCurrency ? (
+                      <Button variant="ghost" onPress={() => setCurrency(undefined)}><Text>Keep {group.currency}</Text></Button>
+                    ) : null}
+                  </View>
                 </View>
               )}
               <FormMessage message={message} />
@@ -339,7 +381,7 @@ export default function ManageGroupScreen({
                       : "Saving…"
                     : memberUserId
                       ? "Remove member"
-                      : "Save name"}
+                      : "Save changes"}
                 </Text>
               </Button>
             </>

@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -32,7 +33,7 @@ export default function SettlementsScreen({ groupId }: { groupId: string }) {
       (item) => item.from._id === userId,
     ) ?? false;
   const format = (amount: number) =>
-    `${group?.currency ? `${group.currency} ` : ""}${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${group?.currency ? `${group.currency} ` : ""}${formatCurrencyAmount(amount, group?.currency)}`;
   function refresh() {
     if (!suggestions.isFetching) void suggestions.refetch();
     if (page !== 1) setPage(1);

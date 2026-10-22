@@ -1,3 +1,4 @@
+import { currencyScale, validAmount, formatCurrencyAmount, amountPrecisionLabel } from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -120,8 +121,9 @@ export default function CreateExpenseScreen({
   const unavailableIds = participantIds.filter(
     (id) => !members.some((member) => member._id === id),
   );
-  const preview = splitPreview(amount, splitType, participantIds, shares);
-  const formatShare = (value: number) => `${group?.currency ?? ""} ${(value / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
+  const preview = splitPreview(amount, splitType, participantIds, shares, group?.currency);
+  const scale = currencyScale(group?.currency);
+  const formatShare = (value: number) => `${group?.currency ?? ""} ${formatCurrencyAmount(value / scale, group?.currency)}`.trim();
   const everyoneSelected = members.length > 0 && members.every(member => participantIds.includes(member._id)) && unavailableIds.length === 0;
 
   function toggleParticipant(id: string) {
@@ -170,13 +172,12 @@ export default function CreateExpenseScreen({
       return;
     }
 
-    if (
-      !/^\d+(\.\d{1,2})?$/.test(normalizedAmount) ||
-      !Number.isFinite(numericAmount) ||
-      numericAmount <= 0 ||
-      !Number.isSafeInteger(Math.round(numericAmount * 100))
-    ) {
-      fieldError("amount", "Enter an amount greater than zero, with up to two decimals.");
+    if (!group) {
+      setMessage("Wait for the group currency to load before saving.");
+      return;
+    }
+    if (!validAmount(normalizedAmount, group.currency)) {
+      fieldError("amount", `Enter an amount greater than zero, with ${amountPrecisionLabel(group.currency)}.`);
       return;
     }
 
@@ -233,20 +234,20 @@ export default function CreateExpenseScreen({
       if (
         values.some(
           (value) =>
-            !/^\d+(\.\d{1,2})?$/.test(value) || !Number.isFinite(Number(value)),
+            !validAmount(value, splitType === "PERCENTAGE" ? "PHP" : group.currency, true),
         )
       ) {
         fieldError("shares",
-          "Enter a nonnegative share for every selected member, with up to two decimals.",
+          `Enter a nonnegative share for every selected member, with ${splitType === "PERCENTAGE" ? "up to 2 decimal places" : amountPrecisionLabel(group.currency)}.`,
         );
         return;
       }
       const total = values.reduce(
-        (sum, value) => sum + Math.round(Number(value) * 100),
+        (sum, value) => sum + Math.round(Number(value) * (splitType === "PERCENTAGE" ? 100 : scale)),
         0,
       );
       if (splitType === "EXACT") {
-        if (total !== Math.round(numericAmount * 100)) {
+        if (total !== Math.round(numericAmount * scale)) {
           fieldError("shares", "Member amounts must add up to the expense amount.");
           return;
         }
@@ -396,7 +397,7 @@ export default function CreateExpenseScreen({
                           {item.description ?? "Unidentified item"}
                         </Text>
                         <Text className="text-xs text-muted-foreground">
-                          {item.total != null ? item.total.toFixed(2) : "—"}
+                          {item.total != null ? formatCurrencyAmount(item.total, receipt.currency ?? group?.currency) : "—"}
                         </Text>
                       </View>
                     ))}
@@ -470,7 +471,7 @@ export default function CreateExpenseScreen({
                   <FormField
                     label={`Amount${group ? ` (${group.currency})` : ""}`}
                     icon="cash-outline"
-                    placeholder="0.00"
+                    placeholder={formatCurrencyAmount(0, group?.currency)}
                     keyboardType="decimal-pad"
                     inputRef={amountInput}
                     value={amount}
@@ -643,7 +644,7 @@ export default function CreateExpenseScreen({
                           label={`${member?.firstName ?? "Member"} ${member?.lastName ?? ""}${splitType === "PERCENTAGE" ? " (%)" : ""}`}
                           icon="cash-outline"
                           keyboardType="decimal-pad"
-                          placeholder="0.00"
+                          placeholder={formatCurrencyAmount(0, splitType === "PERCENTAGE" ? "PHP" : group?.currency)}
                           value={shares[id] ?? ""}
                           editable={!saving}
                           onChangeText={(value) => {
@@ -687,7 +688,7 @@ export default function CreateExpenseScreen({
                               ? "Enter a valid share for every selected participant."
                               : `${splitType === "PERCENTAGE" ? `${(Math.abs(preview.remaining) / 100).toFixed(2)}%` : formatShare(Math.abs(preview.remaining))} ${preview.remaining < 0 ? "over assigned" : "left to assign"}.`}
                       </Text>
-                      {splitType === "PERCENTAGE" ? <Text className="text-xs text-muted-foreground">Estimated amounts; the last participant receives any rounding adjustment once percentages total 100%.</Text> : null}
+                      {splitType === "PERCENTAGE" ? <Text className="text-xs text-muted-foreground">Estimated amounts; rounding is reconciled to the expense total once percentages reach 100%.</Text> : null}
                     </>
                   )}
                 </View>

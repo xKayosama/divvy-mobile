@@ -1,3 +1,4 @@
+import { resolveGroupIcon } from "../groupIcons";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -65,7 +66,7 @@ export default function GroupListScreen() {
           >
             <View className="flex-row items-center gap-4">
               <View className="h-12 w-12 items-center justify-center rounded-2xl bg-secondary">
-                <Ionicons name="people-outline" size={24} color={colors.primary} accessible={false} />
+                <Ionicons name={resolveGroupIcon(item.icon).glyph} size={24} color={colors.primary} accessible={false} />
               </View>
               <View className="min-w-0 flex-1 gap-2">
                 <Text className="text-lg font-semibold">{item.name}</Text>

@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import type { TextInput } from "react-native";
 import { FormField, FormMessage } from "@/components/auth/FormField";
@@ -74,9 +75,10 @@ export default function CreateBillScreen({
 
   async function save() {
     if (submitting.current) return;
+    if (!group) { setMessage("Wait for the group currency to load before saving."); return; }
     const normalizedAmount = amount.trim().replace(",", ".");
     const normalizedDate = dueDate.trim();
-    const errors = validateBillFields(name, normalizedAmount, normalizedDate);
+    const errors = validateBillFields(name, normalizedAmount, normalizedDate, group?.currency);
     setFieldErrors({});
     setMessage("");
     const firstError = Object.entries(errors)[0];
@@ -166,7 +168,7 @@ export default function CreateBillScreen({
             <FormField
               label={`Amount${group ? ` (${group.currency})` : ""}`}
               icon="cash-outline"
-              placeholder="0.00"
+              placeholder={formatCurrencyAmount(0, group?.currency)}
               keyboardType="decimal-pad"
               inputRef={amountInput}
                     value={amount}

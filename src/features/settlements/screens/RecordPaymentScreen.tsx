@@ -1,3 +1,4 @@
+import { currencyScale, formatCurrencyAmount } from "@/features/groups/money";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -93,7 +94,7 @@ export default function RecordPaymentScreen({
   const submitting = useRef(false);
   const selected = members.find((member) => member._id === to);
   const format = (value: number) =>
-    `${group?.currency ? `${group.currency} ` : ""}${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${group?.currency ? `${group.currency} ` : ""}${formatCurrencyAmount(value, group?.currency)}`;
   const unsaved = useUnsavedChanges(!receipt && (snapshot !== initialSnapshot || !!review || !!initialAmount), saving);
 
   function back() {
@@ -103,6 +104,7 @@ export default function RecordPaymentScreen({
     }));
   }
   function prepare() {
+    if (!group) { setMessage("Wait for the group currency to load before reviewing."); return; }
     setMessage("");
     if (!selected) {
       setMessage("Choose an active member to pay.");
@@ -113,7 +115,7 @@ export default function RecordPaymentScreen({
       return;
     }
     const normalized = amount.trim().replace(",", ".");
-    const error = validatePayment(normalized, date);
+    const error = validatePayment(normalized, date, new Date(), group?.currency);
     if (error) {
       fieldError(error.includes("amount") ? "amount" : "date", error);
       return;
@@ -121,7 +123,7 @@ export default function RecordPaymentScreen({
     const remaining =
       outstanding.find((item) => item.to._id === to)?.amount ?? 0;
     if (
-      Math.round(Number(normalized) * 100) > Math.round(remaining * 100) ||
+      Math.round(Number(normalized) * currencyScale(group?.currency)) > Math.round(remaining * currencyScale(group?.currency)) ||
       remaining <= 0
     ) {
       setMessage(
@@ -138,9 +140,9 @@ export default function RecordPaymentScreen({
     });
   }
   async function save() {
-    if (submitting.current || !review || !selected || fetching || !!loadError)
+    if (submitting.current || !review || !selected || !group || fetching || !!loadError)
       return;
-    const error = validatePayment(String(review.amount), date);
+    const error = validatePayment(String(review.amount), date, new Date(), group?.currency);
     if (error) {
       setMessage(error);
       return;
@@ -156,7 +158,7 @@ export default function RecordPaymentScreen({
         )?.amount ?? 0;
       if (
         remaining <= 0 ||
-        Math.round(review.amount * 100) > Math.round(remaining * 100)
+        Math.round(review.amount * currencyScale(group?.currency)) > Math.round(remaining * currencyScale(group?.currency))
       ) {
         setMessage(
           "This repayment is already settled or its outstanding amount changed. Go back to payments for the latest balance.",
@@ -332,7 +334,7 @@ export default function RecordPaymentScreen({
                     label={`Amount${group ? ` (${group.currency})` : ""}`}
                     icon="cash-outline"
                     keyboardType="decimal-pad"
-                    placeholder="0.00"
+                    placeholder={formatCurrencyAmount(0, group?.currency)}
                     value={amount}
               error={fieldErrors.amount}
                     onChangeText={value => { setAmount(value); setFieldErrors({}); setMessage(""); }}

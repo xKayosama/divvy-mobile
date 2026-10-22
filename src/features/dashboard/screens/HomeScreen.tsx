@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { QueryErrorState, ContentState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useState } from "react";
@@ -75,10 +76,7 @@ export default function HomeScreen() {
   }, [groupId, refetch]));
 
   function formatAmount(amount: number) {
-    return new Intl.NumberFormat("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyAmount(amount, group?.currency);
   }
 
   return (
@@ -111,6 +109,7 @@ export default function HomeScreen() {
         <View className="gap-6">
           <DashboardHeader
             groupName={group?.name ?? "Your group"}
+            groupIcon={group?.icon}
             currency={group?.currency}
             onSwitchGroup={() => router.replace("/groups")}
             onOpenProfile={() => {

@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
@@ -32,7 +33,7 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
     router.navigate({ pathname: "/groups/[groupId]/expenses", params: { groupId } });
   }
   function amount(value: number) {
-    return `${group?.currency ? `${group.currency} ` : ""}${new Intl.NumberFormat("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+    return `${group?.currency ? `${group.currency} ` : ""}${formatCurrencyAmount(value, group?.currency)}`;
   }
   async function remove() {
     if (deleteLock.current || !expense || isFetching) return;

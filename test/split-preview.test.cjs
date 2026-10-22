@@ -1,15 +1,15 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const Module = require("node:module");
 const path = require("node:path");
 const ts = require("typescript");
+require.extensions[".ts"] = (module, filename) => {
+  module._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, filename);
+};
 const filename = path.resolve(__dirname, "../src/features/expenses/splitPreview.ts");
-const loaded = new Module(filename);
-loaded._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText, filename);
-const { splitPreview } = loaded.exports;
+const { splitPreview } = require(filename);
 const members = ["first", "second", "third"];
 
 test("equal splits conserve cents and assign the remainder to the first selected member", () => {
@@ -37,4 +37,19 @@ test("invalid or missing input never presents a completed split", () => {
   assert.equal(splitPreview("100", "EQUAL", [], {}), null);
   assert.equal(splitPreview("100", "EXACT", members, { first: "100", second: "", third: "0" }).complete, false);
   assert.equal(splitPreview("1,50", "EQUAL", ["first"], {}).amounts[0], 150);
+});
+
+
+test("native precision conserves JPY whole units and KWD fils", () => {
+  assert.deepEqual(splitPreview("100", "EQUAL", members, {}, "JPY").amounts, [34, 33, 33]);
+  assert.deepEqual(splitPreview("0.100", "EQUAL", members, {}, "KWD").amounts, [34, 33, 33]);
+  assert.equal(splitPreview("1.1", "EQUAL", members, {}, "JPY"), null);
+  assert.equal(splitPreview("0.0001", "EQUAL", members, {}, "KWD"), null);
+  assert.equal(splitPreview("1", "EXACT", members, { first: "0.001", second: "0.999", third: "0" }, "KWD").complete, true);
+  assert.equal(splitPreview("100", "PERCENTAGE", members, { first: "33.33", second: "33.33", third: "33.34" }, "JPY").complete, true);
+});
+test("tiny percentage totals never produce negative shares", () => {
+  const preview = splitPreview("2", "PERCENTAGE", ["a", "b", "c", "d"], { a: "25", b: "25", c: "25", d: "25" }, "JPY");
+  assert.ok(preview.amounts.every(value => value >= 0));
+  assert.equal(preview.amounts.reduce((sum, value) => sum + value, 0), 2);
 });

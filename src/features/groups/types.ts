@@ -1,3 +1,6 @@
+import type { GroupIcon } from "./groupIcons";
+import type { GroupCurrency } from "./currencies";
+
 export type GroupOwner = {
   _id: string;
   firstName: string;
@@ -9,6 +12,7 @@ export type Group = {
   id: string;
   name: string;
   currency: string;
+  icon?: string;
   role: "OWNER" | "MEMBER";
   owner: GroupOwner | null;
   joinedAt: string;
@@ -23,6 +27,8 @@ export type GroupsResponse = {
 
 export type CreateGroupRequest = {
   name: string;
+  currency: GroupCurrency;
+  icon?: GroupIcon;
 };
 
 export type CreateGroupResponse = {
@@ -34,6 +40,7 @@ export type CreateGroupResponse = {
       name: string;
       ownerId: string;
       currency: string;
+      icon?: string;
       createdAt: string;
       updatedAt: string;
     };
@@ -77,6 +84,16 @@ export type AddGroupMemberResponse = {
       email: string;
       role: "MEMBER";
       joinedAt: string;
+    };
+  };
+};
+
+
+export type GroupDetailsResponse = {
+  success: true;
+  data: {
+    group: Pick<Group, "id" | "name" | "currency" | "icon"> & {
+      canChangeCurrency?: boolean;
     };
   };
 };

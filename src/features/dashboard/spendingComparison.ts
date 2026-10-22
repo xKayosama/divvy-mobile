@@ -1,3 +1,4 @@
+import { formatCurrencyAmount } from "@/features/groups/money";
 import type { SpendingComparison } from "./types";
 
 export function spendingComparisonText(comparison: SpendingComparison | null | undefined, currency?: string) {
@@ -5,9 +6,7 @@ export function spendingComparisonText(comparison: SpendingComparison | null | u
   const month = new Date(`${comparison.previous.startDate}T00:00:00Z`).toLocaleDateString("en-PH", {
     month: "long", year: "numeric", timeZone: "UTC",
   });
-  const money = (value: number) => `${currency ? `${currency} ` : ""}${new Intl.NumberFormat("en-PH", {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  }).format(Math.abs(value))}`;
+  const money = (value: number) => `${currency ? `${currency} ` : ""}${formatCurrencyAmount(Math.abs(value), currency)}`;
   const headline = comparison.direction === "unchanged"
     ? `No change from ${month}`
     : `${money(comparison.difference)} ${comparison.direction === "increase" ? "more" : "less"} than ${month}`;
