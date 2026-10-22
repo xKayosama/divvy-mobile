@@ -20,6 +20,13 @@ export type ExpenseCategory =
   | "SHOPPING"
   | "OTHERS";
 
+export type ExpenseItem = {
+  description: string;
+  quantity: number;
+  amount: number;
+  memberIds: string[];
+};
+
 export type Expense = {
   _id: string;
   groupId: string;
@@ -27,7 +34,8 @@ export type Expense = {
   amount: number;
   category: ExpenseCategory;
   paidBy: ExpenseUser | null;
-  splitType: "EQUAL" | "EXACT" | "PERCENTAGE";
+  splitType: "EQUAL" | "EXACT" | "PERCENTAGE" | "ITEMIZED";
+  items?: ExpenseItem[];
   participants: {
     userId: ExpenseUser | null;
     amount: number;
@@ -78,6 +86,10 @@ type ExpenseFields = {
 
 export type CreateExpenseRequest = ExpenseFields &
   (
+    | {
+        splitType: "ITEMIZED";
+        items: ExpenseItem[];
+      }
     | {
         splitType: "EQUAL";
         participants: { userId: string }[];

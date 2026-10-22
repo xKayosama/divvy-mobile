@@ -1578,3 +1578,29 @@ test("group settings load server currency eligibility and submit the selected cu
     assert.deepEqual(writes, [{ name: "Home", currency: "JPY" }, { name: "Home", currency: "KWD" }]);
   } finally { query.unsubscribe(); }
 });
+
+test("itemized expense API sends line assignments and preserves server-calculated shares and details", async () => {
+  signedIn();
+  const items = [{ description: "Pizza", quantity: 2, amount: 15, memberIds: ["u1", "u2"] }];
+  const body = { description: "Dinner", amount: 15, category: "FOOD", paidBy: "u1", splitType: "ITEMIZED", items };
+  const saved = { _id: "itemized1", groupId: "g1", ...body, participants: [{ userId: { _id: "u1" }, amount: 7.5, percentage: null }, { userId: { _id: "u2" }, amount: 7.5, percentage: null }] };
+  const writes = [];
+  global.fetch = async request => {
+    if (request.method !== "GET") {
+      writes.push(await request.json());
+      return respond(request.method === "POST" ? 201 : 200, { success: true, data: { expense: saved } });
+    }
+    return respond(200, { success: true, data: { expense: saved } });
+  };
+  const created = await store.dispatch(expensesApi.endpoints.createExpense.initiate({ groupId: "g1", body })).unwrap();
+  assert.deepEqual(created.data.expense.items, items);
+  assert.equal(created.data.expense.participants[0].amount, 7.5);
+  const details = store.dispatch(expensesApi.endpoints.getExpense.initiate("itemized1"));
+  try {
+    assert.deepEqual((await details.unwrap()).data.expense.items, items);
+    await store.dispatch(expensesApi.endpoints.updateExpense.initiate({ groupId: "g1", expenseId: "itemized1", body })).unwrap();
+    await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query => query.unwrap()));
+    assert.deepEqual(writes, [body, body]);
+    assert.ok(writes.every(body => !("participants" in body)));
+  } finally { details.unsubscribe(); }
+});
