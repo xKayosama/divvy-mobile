@@ -14,6 +14,14 @@ export const billCategories: Record<
   PHONE: "call-outline",
   SUBSCRIPTION: "repeat-outline",
   INSURANCE: "shield-checkmark-outline",
+  GAS: "flame-outline",
+  ASSOCIATION_DUES: "business-outline",
+  EDUCATION: "school-outline",
+  CHILDCARE: "happy-outline",
+  LOAN: "cash-outline",
+  CREDIT_CARD: "card-outline",
+  PROPERTY_TAX: "document-text-outline",
+  MAINTENANCE: "construct-outline",
   OTHER: "ellipsis-horizontal-circle-outline",
 };
 
@@ -44,6 +52,6 @@ export function validateBillForm(name: string, amount: string, dueDate: string, 
 
 export const billCategoryOptions = (Object.keys(billCategories) as BillCategory[]).map(value => ({
   value,
-  label: value.charAt(0) + value.slice(1).toLowerCase(),
+  label: value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " "),
   icon: billCategories[value],
 }));

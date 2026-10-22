@@ -53,3 +53,37 @@ test("tiny percentage totals never produce negative shares", () => {
   assert.ok(preview.amounts.every(value => value >= 0));
   assert.equal(preview.amounts.reduce((sum, value) => sum + value, 0), 2);
 });
+
+const { parseShareWeight, splitByShares } = require("../src/features/expenses/shareSplit.ts");
+test("share weights require bounded positive whole numbers", () => {
+  for (const value of ["", "0", "-1", "1.5", "NaN", "1000001", "1e2"]) assert.equal(parseShareWeight(value), null);
+  assert.equal(parseShareWeight(" 2 "), 2);
+  assert.equal(parseShareWeight("1000000"), 1000000);
+});
+test("weighted shares conserve native currency units and allocate largest remainders", () => {
+  const ids = ["a", "b"];
+  for (const [amount, currency, expected] of [["100", "PHP", [6667, 3333]], ["100", "JPY", [67, 33]], ["0.100", "KWD", [67, 33]]]) {
+    const result = splitPreview(amount, "SHARES", ids, { a: "2", b: "1" }, currency);
+    assert.equal(result.complete, true);
+    assert.equal(result.totalShares, 3);
+    assert.deepEqual(result.amounts, expected);
+  }
+  assert.deepEqual(splitPreview("0.01", "SHARES", ids, { a: "1", b: "2" }).amounts, [0, 1]);
+  assert.deepEqual(splitByShares(2, [1, 1, 1]), [1, 1, 0]);
+});
+test("invalid share drafts remain incomplete and large allocations remain exact", () => {
+  for (const value of ["", "0", "1.5", "1000001"]) {
+    assert.equal(splitPreview("100", "SHARES", ["a", "b"], { a: "2", b: value }).complete, false);
+  }
+  const amounts = splitByShares(Number.MAX_SAFE_INTEGER, [1000000, 999999]);
+  assert.equal(amounts.reduce((sum, n) => sum + BigInt(n), 0n), BigInt(Number.MAX_SAFE_INTEGER));
+});
+
+
+test("expanded expense categories survive dashboard filter navigation", () => {
+ const {expenseFiltersFromParams}=require("../src/features/expenses/filters.ts");
+ for(const category of ["COFFEE","TRAVEL","ACCOMMODATION","FUEL","PARKING","EDUCATION","PETS","GIFTS","HOME_MAINTENANCE","PERSONAL_CARE","FITNESS","SUBSCRIPTIONS"]) {
+  assert.deepEqual(expenseFiltersFromParams({category,startDate:"2026-10-01"}),{category,startDate:"2026-10-01",endDate:undefined});
+ }
+ assert.deepEqual(expenseFiltersFromParams({category:"UNSUPPORTED"}),{});
+});

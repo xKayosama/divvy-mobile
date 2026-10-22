@@ -22,7 +22,7 @@ import ExpenseFiltersModal from "../components/ExpenseFiltersModal";
 import type { ExpenseFilters } from "../filters";
 
 const splitLabels = {
-  EQUAL: "Equal split",
+  EQUAL: "Equal split", SHARES: "By shares",
   ITEMIZED: "Itemized split",
   EXACT: "Exact split",
   PERCENTAGE: "Percentage split",
@@ -243,7 +243,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
         {hasFilters ? (
           <Text className="text-xs text-muted-foreground">
             {[
-              filters.category?.toLowerCase(),
+              filters.category?.toLowerCase().replace(/_/g, " "),
               filters.startDate ? `From ${filters.startDate}` : undefined,
               filters.endDate ? `Through ${filters.endDate}` : undefined,
             ]
@@ -315,8 +315,8 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
                   <Ionicons name={categoryIcons[item.category] ?? categoryIcons.OTHERS} size={21} color={colors.primary} accessible={false} />
                 </View>
                 <View className="min-w-0 flex-1 gap-1">
-                  <Text numberOfLines={2} className="font-semibold">{item.description}</Text>
-                  <Text className="text-xs capitalize text-muted-foreground">{item.category.toLowerCase()}</Text>
+                  <Text numberOfLines={2} ellipsizeMode="tail" className="w-full min-w-0 shrink font-semibold leading-6 web:break-words">{item.description}</Text>
+                  <Text className="text-xs capitalize text-muted-foreground">{item.category.toLowerCase().replace(/_/g, " ")}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} accessible={false} />
               </View>

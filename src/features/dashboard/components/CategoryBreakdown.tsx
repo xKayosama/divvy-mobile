@@ -38,7 +38,7 @@ export default function CategoryBreakdown({ categories, periodLabel, currency, f
       ) : (
         <View className="gap-4">
           {visible.map(item => {
-            const label = item.category.charAt(0) + item.category.slice(1).toLowerCase();
+            const label = item.category.charAt(0) + item.category.slice(1).toLowerCase().replace(/_/g, " ");
             const percentage = new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2 }).format(item.percentage);
             return (
               <Pressable

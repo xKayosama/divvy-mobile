@@ -15,7 +15,7 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { categoryIcons } from "../categoryIcons";
 import { useDeleteExpenseMutation, useGetExpenseQuery } from "../expensesApi";
 
-const splitLabels = { EQUAL: "Equal split", EXACT: "Exact amounts", PERCENTAGE: "Percentage split", ITEMIZED: "Itemized split" };
+const splitLabels = { EQUAL: "Equal split", SHARES: "By shares", EXACT: "Exact amounts", PERCENTAGE: "Percentage split", ITEMIZED: "Itemized split" };
 
 export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: string; expenseId: string }) {
   const { colors, surfaces } = useTheme();
@@ -74,8 +74,8 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
                   <Ionicons name={categoryIcons[expense.category] ?? categoryIcons.OTHERS} size={24} color={colors.primary} accessible={false} />
                 </View>
                 <View className="min-w-0 flex-1 gap-1">
-                  <Text className="text-xl font-semibold">{expense.description}</Text>
-                  <Text className="text-sm capitalize text-muted-foreground">{expense.category.toLowerCase()}</Text>
+                  <Text selectable className="w-full min-w-0 shrink text-xl font-semibold web:break-words">{expense.description}</Text>
+                  <Text className="text-sm capitalize text-muted-foreground">{expense.category.toLowerCase().replace(/_/g, " ")}</Text>
                 </View>
               </View>
               <Text className="text-3xl font-semibold" style={{ fontVariant: ["tabular-nums"] }}>{amount(expense.amount)}</Text>
@@ -101,6 +101,10 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
                     }).join(", ")}</Text>
                   </View>
                 ))}
+                {(["tax", "tip"] as const).map(key => {
+                  const charge = expense.adjustments?.[key];
+                  return charge ? <View key={key} className="gap-1 border-t border-border pt-3"><Text className="font-semibold">{key === "tax" ? "Tax" : "Tip"}: {amount(charge.amount)}</Text><Text className="text-sm text-muted-foreground">{charge.allocation === "EQUAL" ? "Split equally among assigned members" : "Split by each member’s item subtotal"}</Text></View> : null;
+                })}
               </View>
             ) : null}
             <View className="gap-4 rounded-[24px] bg-card p-5" style={surfaces.card}>
@@ -112,7 +116,7 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
                 <View key={participant.userId?._id ?? `former-${index}`} className="gap-2 border-t border-border pt-3">
                   <View className="flex-row items-center gap-3">
                     <UserAvatar firstName={participant.userId?.firstName} lastName={participant.userId?.lastName} imageUrl={participant.userId?.avatar} size={34} />
-                    <Text className="flex-1 text-sm">{participant.userId ? `${participant.userId.firstName} ${participant.userId.lastName}` : "Former member"}{participant.percentage != null ? ` (${participant.percentage}%)` : ""}</Text>
+                    <Text className="flex-1 text-sm">{participant.userId ? `${participant.userId.firstName} ${participant.userId.lastName}` : "Former member"}{expense.splitType === "SHARES" && participant.shares != null ? ` (${participant.shares} ${participant.shares === 1 ? "share" : "shares"})` : participant.percentage != null ? ` (${participant.percentage}%)` : ""}</Text>
                   </View>
                   <Text className="ml-12 text-sm font-semibold">{amount(participant.amount)}</Text>
                 </View>

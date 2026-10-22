@@ -18,7 +18,26 @@ export type ExpenseCategory =
   | "HEALTHCARE"
   | "ENTERTAINMENT"
   | "SHOPPING"
+  | "COFFEE"
+  | "TRAVEL"
+  | "ACCOMMODATION"
+  | "FUEL"
+  | "PARKING"
+  | "EDUCATION"
+  | "PETS"
+  | "GIFTS"
+  | "HOME_MAINTENANCE"
+  | "PERSONAL_CARE"
+  | "FITNESS"
+  | "SUBSCRIPTIONS"
   | "OTHERS";
+
+export type ItemizedAdjustments = Partial<
+  Record<
+    "tax" | "tip",
+    { amount: number; allocation: "EQUAL" | "PROPORTIONAL" }
+  >
+>;
 
 export type ExpenseItem = {
   description: string;
@@ -34,12 +53,14 @@ export type Expense = {
   amount: number;
   category: ExpenseCategory;
   paidBy: ExpenseUser | null;
-  splitType: "EQUAL" | "EXACT" | "PERCENTAGE" | "ITEMIZED";
+  splitType: "EQUAL" | "EXACT" | "PERCENTAGE" | "ITEMIZED" | "SHARES";
   items?: ExpenseItem[];
+  adjustments?: ItemizedAdjustments;
   participants: {
     userId: ExpenseUser | null;
     amount: number;
     percentage: number | null;
+    shares?: number | null;
   }[];
   date: string;
   notes: string;
@@ -89,10 +110,15 @@ export type CreateExpenseRequest = ExpenseFields &
     | {
         splitType: "ITEMIZED";
         items: ExpenseItem[];
+        adjustments?: ItemizedAdjustments;
       }
     | {
         splitType: "EQUAL";
         participants: { userId: string }[];
+      }
+    | {
+        splitType: "SHARES";
+        participants: { userId: string; shares: number }[];
       }
     | {
         splitType: "EXACT";
