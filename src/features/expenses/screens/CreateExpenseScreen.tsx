@@ -1,3 +1,5 @@
+import { ExpenseRepeatFields } from "../components/ExpenseSchedule";
+import { validateRecurrenceEnd } from "../recurrence";
 import { parseShareWeight, MAX_SHARE_WEIGHT } from "../shareSplit";
 import { ExpenseMemberSelector } from "../components/ExpenseMemberSelector";
 import { ItemizedExpenseEditor } from "../components/ItemizedExpenseEditor";
@@ -51,7 +53,7 @@ import {
   useUpdateExpenseMutation,
 } from "../expensesApi";
 import { splitPreview } from "../splitPreview";
-import type { CreateExpenseRequest, Expense, ExpenseCategory } from "../types";
+import type { CreateExpenseRequest, Expense, ExpenseCategory, ExpenseFrequency } from "../types";
 
 function calendarDate(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -87,6 +89,9 @@ export default function CreateExpenseScreen({
       ...(receipt.tip != null ? { tip: { amount: receipt.tip, allocation: "PROPORTIONAL" as const } } : {}),
     } : undefined),
   ));
+  const [repeat,setRepeat] = useState(false);
+  const [frequency,setFrequency] = useState<ExpenseFrequency>("MONTHLY");
+  const [recurrenceEnd,setRecurrenceEnd] = useState("");
   const [receiptReviewed, setReceiptReviewed] = useState(false);
   const [description, setDescription] = useState(
     expense?.description ?? draft?.description ?? "",
@@ -127,10 +132,11 @@ export default function CreateExpenseScreen({
   const [date, setDate] = useState(() => {
     return draft
       ? draft.date
-      : calendarDate(expense ? new Date(expense.date) : new Date());
+      : expense?.recurring ? expense.date.slice(0,10) : calendarDate(expense ? new Date(expense.date) : new Date());
   });
   const [notes, setNotes] = useState(expense?.notes ?? draft?.notes ?? "");
   const snapshot = JSON.stringify({
+    repeat,frequency,recurrenceEnd,
     mode,
     items,
     adjustments,
@@ -276,13 +282,17 @@ export default function CreateExpenseScreen({
       return;
     }
 
+    if (!expense && repeat) {
+      const recurrenceError = validateRecurrenceEnd(recurrenceEnd,normalizedDate);
+      if (recurrenceError) { fieldError("recurrenceEnd",recurrenceError); return; }
+    }
     const fields = {
       description: description.trim(),
       amount: numericAmount,
       category,
       paidBy,
       date:
-        expense && normalizedDate === calendarDate(new Date(expense.date))
+        expense?.recurring ? expense.date : !expense && repeat ? `${normalizedDate}T00:00:00.000Z` : expense && normalizedDate === calendarDate(new Date(expense.date))
           ? expense.date
           : expenseDate.toISOString(),
       notes: notes.trim(),
@@ -396,7 +406,7 @@ export default function CreateExpenseScreen({
       if (expense) {
         await updateExpense({ groupId, expenseId: expense._id, body }).unwrap();
       } else {
-        await createExpense({ groupId, body }).unwrap();
+        await createExpense({ groupId, body: {...body,...(repeat ? {recurring:{frequency,endDate:recurrenceEnd||null}} : {})} }).unwrap();
       }
 
       unsaved.complete(leaveSavedForm);
@@ -985,8 +995,10 @@ export default function CreateExpenseScreen({
                     setFieldErrors({});
                     setMessage("");
                   }}
-                  disabled={saving}
+                  disabled={saving || !!expense?.recurring}
                 />
+                {expense?.recurring ? <Text className="text-sm text-muted-foreground">The first date anchors this schedule. Other edits apply to future entries; manage pause and end dates in expense details.</Text> : null}
+                {!expense ? <ExpenseRepeatFields repeat={repeat} frequency={frequency} endDate={recurrenceEnd} onRepeat={setRepeat} onFrequency={setFrequency} onEndDate={setRecurrenceEnd} disabled={saving} error={fieldErrors.recurrenceEnd}/> : null}
 
                 <FormField
                   label="Notes"

@@ -87,3 +87,11 @@ test("expanded expense categories survive dashboard filter navigation", () => {
  }
  assert.deepEqual(expenseFiltersFromParams({category:"UNSUPPORTED"}),{});
 });
+
+test("recurring end dates validate real calendar dates and cannot precede the original", () => {
+  const { validateRecurrenceEnd } = require("../src/features/expenses/recurrence.ts");
+  assert.equal(validateRecurrenceEnd("", "2026-10-22"), "");
+  assert.equal(validateRecurrenceEnd("2026-10-22", "2026-10-22"), "");
+  assert.equal(validateRecurrenceEnd("2028-02-29", "2026-10-22"), "");
+  for (const end of ["2026-02-29", "2026-10-21", "2026-13-01", "bad"]) assert.ok(validateRecurrenceEnd(end, "2026-10-22"));
+});

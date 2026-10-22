@@ -1645,3 +1645,39 @@ test("shares expense API sends weights and preserves calculated amounts for edit
     assert.deepEqual(writes, [body, body]);
   } finally { details.unsubscribe(); }
 });
+
+test("recurring expense creation and schedule management preserve splits and refresh details", async () => {
+  signedIn();
+  const recurring = { frequency: "MONTHLY", endDate: "2027-12-31" };
+  const body = { description: "Subscription", amount: 30, category: "SUBSCRIPTIONS", paidBy: "u1", date: "2026-10-22T00:00:00.000Z", splitType: "SHARES", participants: [{ userId: "u1", shares: 2 }, { userId: "u2", shares: 1 }], recurring };
+  const saved = { _id: "recurring1", groupId: "g1", ...body, recurring: { ...recurring, anchor: body.date, paused: false, nextNumber: 1, nextDate: "2026-11-22T00:00:00.000Z", lastError: "" }, participants: [{ userId: { _id: "u1" }, amount: 20, shares: 2 }, { userId: { _id: "u2" }, amount: 10, shares: 1 }] };
+  const writes = [];
+  global.fetch = async request => {
+    if (request.method !== "GET") {
+      const sent = await request.json(); writes.push({ method: request.method, url: request.url, body: sent });
+      if (request.method === "PATCH") Object.assign(saved.recurring, sent);
+    }
+    return respond(request.method === "POST" ? 201 : 200, { success: true, data: { expense: saved } });
+  };
+  assert.equal((await store.dispatch(expensesApi.endpoints.createExpense.initiate({ groupId: "g1", body })).unwrap()).data.expense.recurring.frequency, "MONTHLY");
+  const query = store.dispatch(expensesApi.endpoints.getExpense.initiate("recurring1"));
+  try {
+    await query.unwrap();
+    for (const patch of [{ paused: true }, { paused: false }, { endDate: null }]) {
+      await store.dispatch(expensesApi.endpoints.updateExpenseRecurrence.initiate({ groupId: "g1", expenseId: "recurring1", body: patch })).unwrap();
+      await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query => query.unwrap()));
+    }
+    const details = expensesApi.endpoints.getExpense.select("recurring1")(store.getState()).data.data.expense;
+    assert.equal(details.recurring.paused, false); assert.equal(details.recurring.endDate, null);
+    assert.equal(details.participants[0].shares, 2);
+    assert.deepEqual(writes.map(write => write.method), ["POST", "PATCH", "PATCH", "PATCH"]);
+    assert.deepEqual(writes[0].body, body);
+    assert.ok(writes.slice(1).every(write => write.url.endsWith("/expenses/recurring1/recurrence")));
+  } finally { query.unsubscribe(); }
+});
+test("schedule conflicts preserve the signed-in session and surface a retryable error", async () => {
+  signedIn();
+  global.fetch = async () => respond(409, { success: false, message: "Schedule is processing. Try again shortly." });
+  await assert.rejects(store.dispatch(expensesApi.endpoints.updateExpenseRecurrence.initiate({ groupId: "g1", expenseId: "e", body: { paused: true } })).unwrap(), error => error.status === 409);
+  assert.ok(store.getState().auth.token);
+});
