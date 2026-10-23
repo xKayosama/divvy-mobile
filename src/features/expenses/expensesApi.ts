@@ -20,6 +20,28 @@ export const expensesApi = api
           { type: "Expenses", id: `expense:${expenseId}` },
         ],
       }),
+      updateExpenseRecurrence: builder.mutation<
+        ExpenseResponse,
+        {
+          groupId: string;
+          expenseId: string;
+          body: { paused?: boolean; endDate?: string | null };
+        }
+      >({
+        query: ({ expenseId, body }) => ({
+          url: `/expenses/${encodeURIComponent(expenseId)}/recurrence`,
+          method: "PATCH",
+          body,
+        }),
+        invalidatesTags: (_result, error, { groupId, expenseId }) =>
+          error
+            ? []
+            : [
+                { type: "Expenses", id: groupId },
+                { type: "Expenses", id: `expense:${expenseId}` },
+                { type: "Dashboard", id: groupId },
+              ],
+      }),
       updateExpense: builder.mutation<
         ExpenseResponse,
         { groupId: string; expenseId: string; body: CreateExpenseRequest }
@@ -95,6 +117,7 @@ export const expensesApi = api
   });
 
 export const {
+  useUpdateExpenseRecurrenceMutation,
   useGetGroupExpensesQuery,
   useCreateExpenseMutation,
   useGetExpenseQuery,

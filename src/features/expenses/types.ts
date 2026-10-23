@@ -1,3 +1,13 @@
+export type ExpenseFrequency = "WEEKLY" | "MONTHLY" | "YEARLY";
+export type ExpenseSchedule = {
+  frequency: ExpenseFrequency;
+  anchor: string;
+  endDate: string | null;
+  paused: boolean;
+  nextNumber: number;
+  nextDate: string | null;
+  lastError: string;
+};
 export type ExpenseSort = "newest" | "oldest" | "amount_high" | "amount_low";
 
 export type ExpenseUser = {
@@ -64,6 +74,9 @@ export type Expense = {
   }[];
   date: string;
   notes: string;
+  recurring?: ExpenseSchedule;
+  recurrenceSourceId?: string | null;
+  occurrenceNumber?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -103,6 +116,7 @@ type ExpenseFields = {
   paidBy: string;
   date?: string;
   notes?: string;
+  recurring?: { frequency: ExpenseFrequency; endDate?: string | null };
 };
 
 export type CreateExpenseRequest = ExpenseFields &

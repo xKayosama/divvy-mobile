@@ -1,3 +1,4 @@
+import { frequencyLabels } from "../recurrence";
 import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import { ListSortControl } from "@/components/ui/list-sort-control";
@@ -323,6 +324,7 @@ export default function ExpensesScreen({ groupId, initialFilters = {} }: { group
               <View className="flex-row flex-wrap items-center justify-between gap-2">
                 <Text className="text-xl font-semibold">{group?.currency ? `${group.currency} ` : ""}{formatAmount(item.amount)}</Text>
                 <Text className="text-xs text-muted-foreground">{splitLabels[item.splitType]}</Text>
+                {item.recurring ? <Text className="text-xs text-primary">{frequencyLabels[item.recurring.frequency]} · {item.recurring.paused ? "Paused" : item.recurring.nextDate ? "Repeating" : "Completed"}</Text> : item.recurrenceSourceId ? <Text className="text-xs text-muted-foreground">Recurring occurrence</Text> : null}
               </View>
               <Text className="text-xs text-muted-foreground">
                 Paid by {item.paidBy ? `${item.paidBy.firstName} ${item.paidBy.lastName}` : "Unknown member"}

@@ -1,3 +1,4 @@
+import { ExpenseSchedule } from "../components/ExpenseSchedule";
 import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -126,10 +127,12 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
               <Text accessibilityRole="header" className="text-lg font-semibold">Notes</Text>
               <Text className="text-sm text-muted-foreground">{expense.notes?.trim() || "No notes added."}</Text>
             </View>
+            <ExpenseSchedule key={`${expense._id}:${JSON.stringify(expense.recurring)}`} expense={expense} disabled={deleting || isFetching}/>
             <View className="gap-3">
               {confirmDelete ? (
                 <View className="gap-4 rounded-[24px] border border-border bg-card p-5">
                   <Text className="font-semibold">Delete this expense?</Text>
+                  {expense.recurring ? <Text>Deleting the original also stops its recurring schedule. Existing occurrences remain.</Text> : null}
                   <Text>Delete “{expense.description}” ({amount(expense.amount)})? This cannot be undone and will update group balances.</Text>
                   {message ? <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">{message}</Text> : null}
                   <Button variant="destructive" disabled={deleting || isFetching} onPress={() => void remove()}><Text>{deleting ? "Deleting…" : "Confirm delete"}</Text></Button>
