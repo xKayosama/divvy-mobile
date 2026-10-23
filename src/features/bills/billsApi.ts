@@ -9,7 +9,7 @@ import type {
 
 export const billsApi = api
   .enhanceEndpoints({
-    addTagTypes: ["Bills", "Dashboard", "Expenses"],
+    addTagTypes: ["Activity", "Bills", "Dashboard", "Expenses"],
   })
   .injectEndpoints({
     // Replace stale query definitions when Metro reevaluates this module.
@@ -30,6 +30,7 @@ export const billsApi = api
             : [
                 { type: "Bills", id: groupId },
                 { type: "Bills", id: `bill:${billId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -47,6 +48,7 @@ export const billsApi = api
             : [
                 { type: "Bills", id: groupId },
                 { type: "Bills", id: `bill:${billId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -70,6 +72,7 @@ export const billsApi = api
             ? []
             : [
                 { type: "Bills", id: groupId },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -88,6 +91,7 @@ export const billsApi = api
             : [
                 { type: "Bills", id: groupId },
                 { type: "Bills", id: `bill:${billId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
                 { type: "Expenses", id: groupId },
                 ...(result?.data.expense

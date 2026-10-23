@@ -130,9 +130,32 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
                 </Text>
               ) : null}
             </View>
+            <Button
+              variant="outline"
+              onPress={() =>
+                router.push({
+                  pathname: "/groups/[groupId]/activity",
+                  params: { groupId },
+                })
+              }
+            >
+              <Ionicons
+                name="time-outline"
+                size={20}
+                color={colors.foreground}
+                accessible={false}
+              />
+              <Text>Activity history</Text>
+            </Button>
             <Text className="text-lg font-semibold">Members</Text>
             {isError ? (
-              <QueryErrorState error={error} subject="Members" busy={isFetching} onRetry={() => void refetch()} onBack={() => router.navigate("/groups")} />
+              <QueryErrorState
+                error={error}
+                subject="Members"
+                busy={isFetching}
+                onRetry={() => void refetch()}
+                onBack={() => router.navigate("/groups")}
+              />
             ) : null}
           </View>
         }
@@ -143,7 +166,14 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
               accessibilityLabel="Loading members"
             />
           ) : !isError ? (
-            <ContentState icon="people-outline" title="No active members" description="No members are available to display. Refresh to check for updates." actionLabel="Refresh members" onAction={() => void refetch()} busy={isFetching} />
+            <ContentState
+              icon="people-outline"
+              title="No active members"
+              description="No members are available to display. Refresh to check for updates."
+              actionLabel="Refresh members"
+              onAction={() => void refetch()}
+              busy={isFetching}
+            />
           ) : null
         }
         renderItem={({ item }) => (

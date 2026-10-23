@@ -1747,3 +1747,32 @@ test("soft-delete and restore use separate group actions, preserving the permane
   assert.equal(activeReads,3);assert.equal(deletedReads,3);
  }finally{active.unsubscribe();deleted.unsubscribe();}
 });
+
+test("activity history separates groups and pages and refreshes after expense, payment, and settings mutations",async()=>{
+ const {activityApi}=require('../src/features/activity/activityApi.ts');
+ signedIn();const reads=[];
+ global.fetch=async request=>{
+  const url=new URL(request.url);
+  if(url.pathname.endsWith('/activity')) {reads.push(url.pathname+url.search);return respond(200,{success:true,data:{activities:[{_id:url.pathname+url.search,action:'EXPENSE_DELETED',label:'Dinner',actor:null,occurredAt:'2026-10-24T00:00:00Z'}],pagination:{page:Number(url.searchParams.get('page')),limit:20,total:21,totalPages:2}}});}
+  return respond(200,{success:true,data:{expense:{_id:'e'},bill:{_id:'b'},group:{_id:'g'}}});
+ };
+ const args=[{groupId:'gActivity',page:1},{groupId:'gActivity',page:2},{groupId:'other',page:1}];
+ const queries=args.map(arg=>store.dispatch(activityApi.endpoints.getGroupActivity.initiate(arg)));
+ try{
+  await Promise.all(queries.map(query=>query.unwrap()));
+  assert.equal(reads.length,3);assert.ok(reads[0].includes('page=1&limit=20'));
+  assert.notEqual(activityApi.endpoints.getGroupActivity.select(args[0])(store.getState()).data.data.activities[0]._id,activityApi.endpoints.getGroupActivity.select(args[1])(store.getState()).data.data.activities[0]._id);
+  for(const mutation of [expensesApi.endpoints.deleteExpense.initiate({groupId:'gActivity',expenseId:'e'}),billsApi.endpoints.markBillPaid.initiate({groupId:'gActivity',billId:'b',body:{resume:true}}),groupsApi.endpoints.renameGroup.initiate({groupId:'gActivity',name:'Holiday'})]){
+   await store.dispatch(mutation).unwrap();
+   await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query=>query.unwrap()));
+  }
+  assert.equal(reads.length,12);
+ }finally{queries.forEach(query=>query.unsubscribe());}
+});
+test("activity detail formatting preserves native precision, old values, item assignments and missing members",()=>{
+ const {activityValue}=require('../src/features/activity/format.ts');
+ assert.equal(activityValue(123,'amount','JPY'),'JPY 123');assert.equal(activityValue(.003,'amount','KWD'),'KWD 0.003');
+ assert.equal(activityValue('SHARES','splitType','PHP'),'By shares');assert.equal(activityValue(null,'notes','PHP'),'None');
+ assert.match(activityValue([{userId:'a',amount:10,shares:2}],'participants','PHP',{a:'Sam'}),/Sam: PHP 10.00 \(2 shares\)/);
+ assert.match(activityValue([{description:'Meal',quantity:1,amount:10,memberIds:['missing']}],'items','PHP'),/Unavailable member/);
+});

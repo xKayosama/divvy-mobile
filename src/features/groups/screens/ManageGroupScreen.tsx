@@ -1,3 +1,4 @@
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal";
 import { CurrencySelector } from "../components/CurrencySelector";
 import type { GroupCurrency } from "../currencies";
 import { GroupIconSelector } from "../components/GroupIconSelector";
@@ -92,6 +93,7 @@ export default function ManageGroupScreen({
   const [renameGroup, { isLoading: renaming }] = useRenameGroupMutation();
   const [softDelete,{isLoading:deletingGroup}]=useSoftDeleteGroupMutation();
   const [confirmSoftDelete,setConfirmSoftDelete]=useState(false);
+  const [deleteMessage,setDeleteMessage]=useState("");
   const saving = removing || renaming || deletingGroup;
   const unsaved = useUnsavedChanges(!done && !memberUserId && (currencyChanged || (name !== undefined && name !== group?.name) || (icon !== undefined && icon !== resolveGroupIcon(group?.icon).value)), saving);
 
@@ -100,6 +102,25 @@ export default function ManageGroupScreen({
       pathname: "/groups/[groupId]/group",
       params: { groupId },
     }));
+  }
+  function closeSoftDelete() {
+    if (submitting.current || deletingGroup) return;
+    setConfirmSoftDelete(false);
+    setDeleteMessage("");
+  }
+  async function deleteGroup() {
+    if (submitting.current || saving || fetching || error || !isOwner || !group || memberUserId || !confirmSoftDelete) return;
+    submitting.current = true;
+    setDeleteMessage("");
+    try {
+      await softDelete(groupId).unwrap();
+      setConfirmSoftDelete(false);
+      unsaved.complete(() => router.navigate("/groups"));
+    } catch (error) {
+      setDeleteMessage(authError(error,"Could not soft delete the group. Refresh and retry."));
+    } finally {
+      submitting.current = false;
+    }
   }
   async function save() {
     if (submitting.current || fetching || error || !isOwner || !group) return;
@@ -390,7 +411,7 @@ export default function ManageGroupScreen({
               {!memberUserId ? <View className="gap-3 rounded-2xl border border-destructive/30 p-4">
                 <Text className="font-semibold">Soft delete group</Text>
                 <Text className="text-sm text-muted-foreground">Hide this group for all members while preserving expenses, bills and payments. Restore it later from Deleted groups. Recurring expenses will stay paused after restoration.</Text>
-                {confirmSoftDelete ? <><Text>Move “{group.name}” to Deleted groups? Unsaved settings will not be saved.</Text><Button variant="destructive" disabled={saving||fetching} onPress={async()=>{try{await softDelete(groupId).unwrap();unsaved.complete(()=>router.navigate("/groups"));}catch(error){setMessage(authError(error,"Could not soft delete the group. Refresh and retry."));}}}><Text>{deletingGroup?"Deleting…":"Confirm soft delete"}</Text></Button><Button variant="outline" disabled={saving} onPress={()=>setConfirmSoftDelete(false)}><Text>Keep group</Text></Button></>:<Button variant="outline" disabled={saving||fetching} onPress={()=>setConfirmSoftDelete(true)}><Text className="text-destructive">Soft delete group</Text></Button>}
+                <Button variant="outline" disabled={saving||fetching} onPress={()=>{Keyboard.dismiss();setDeleteMessage("");setConfirmSoftDelete(true);}}><Text className="text-destructive">Soft delete group</Text></Button>
               </View>:null}
 
             </>
@@ -402,6 +423,21 @@ export default function ManageGroupScreen({
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      <DeleteConfirmationModal
+        visible={confirmSoftDelete && !!group && isOwner && !memberUserId && !done && !error}
+        title="Soft delete group?"
+        name={group?.name ?? ""}
+        message={deleteMessage}
+        busy={deletingGroup}
+        disabled={saving || fetching}
+        confirmLabel="Soft delete group"
+        cancelLabel="Keep group"
+        onClose={closeSoftDelete}
+        onConfirm={() => void deleteGroup()}
+      >
+        <Text className="text-sm text-muted-foreground">This hides the group for all members. Expenses, bills and payments are preserved. Restore it later from Deleted groups.</Text>
+        <Text className="text-sm text-muted-foreground">Recurring expenses will stay paused after restoration. Unsaved settings will not be saved.</Text>
+      </DeleteConfirmationModal>
       {unsaved.dialog}
     </SafeAreaView>
   );

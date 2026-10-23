@@ -12,17 +12,61 @@ import type {
 } from "./types";
 
 export const groupsApi = api
-  .enhanceEndpoints({ addTagTypes: ["Groups", "Dashboard", "Bills", "Expenses", "Settlements"] })
+  .enhanceEndpoints({
+    addTagTypes: [
+      "Activity",
+      "Groups",
+      "Dashboard",
+      "Bills",
+      "Expenses",
+      "Settlements",
+    ],
+  })
   .injectEndpoints({
     endpoints: (builder) => ({
-      getDeletedGroups: builder.query<DeletedGroupsResponse,void>({query:()=>"/groups/deleted",providesTags:["Groups"]}),
-      softDeleteGroup: builder.mutation<{success:true;message:string},string>({
-        query:id=>({url:`/groups/${encodeURIComponent(id)}/soft-delete`,method:"POST"}),
-        invalidatesTags:(_result,error)=>error?[]:["Groups","Dashboard","Bills","Expenses","Settlements"],
+      getDeletedGroups: builder.query<DeletedGroupsResponse, void>({
+        query: () => "/groups/deleted",
+        providesTags: ["Groups"],
       }),
-      restoreGroup: builder.mutation<{success:true;message:string},string>({
-        query:id=>({url:`/groups/${encodeURIComponent(id)}/restore`,method:"POST"}),
-        invalidatesTags:(_result,error)=>error?[]:["Groups","Dashboard","Bills","Expenses","Settlements"],
+      softDeleteGroup: builder.mutation<
+        { success: true; message: string },
+        string
+      >({
+        query: (id) => ({
+          url: `/groups/${encodeURIComponent(id)}/soft-delete`,
+          method: "POST",
+        }),
+        invalidatesTags: (_result, error) =>
+          error
+            ? []
+            : [
+                "Activity",
+                "Groups",
+                "Dashboard",
+                "Bills",
+                "Expenses",
+                "Settlements",
+              ],
+      }),
+      restoreGroup: builder.mutation<
+        { success: true; message: string },
+        string
+      >({
+        query: (id) => ({
+          url: `/groups/${encodeURIComponent(id)}/restore`,
+          method: "POST",
+        }),
+        invalidatesTags: (_result, error) =>
+          error
+            ? []
+            : [
+                "Activity",
+                "Groups",
+                "Dashboard",
+                "Bills",
+                "Expenses",
+                "Settlements",
+              ],
       }),
       getGroupDetails: builder.query<GroupDetailsResponse, string>({
         query: (groupId) => `/groups/${encodeURIComponent(groupId)}`,
@@ -30,14 +74,32 @@ export const groupsApi = api
       }),
       renameGroup: builder.mutation<
         CreateGroupResponse,
-        { groupId: string; name: string; icon?: GroupIcon; currency?: GroupCurrency }
+        {
+          groupId: string;
+          name: string;
+          icon?: GroupIcon;
+          currency?: GroupCurrency;
+        }
       >({
         query: ({ groupId, name, icon, currency }) => ({
           url: `/groups/${encodeURIComponent(groupId)}`,
           method: "PUT",
-          body: { name: name.trim(), ...(icon !== undefined ? { icon } : {}), ...(currency !== undefined ? { currency } : {}) },
+          body: {
+            name: name.trim(),
+            ...(icon !== undefined ? { icon } : {}),
+            ...(currency !== undefined ? { currency } : {}),
+          },
         }),
-        invalidatesTags: (_result, error, { groupId, currency }) => error ? [] : ["Groups", ...(currency !== undefined ? [{ type: "Dashboard" as const, id: groupId }] : [])],
+        invalidatesTags: (_result, error, { groupId, currency }) =>
+          error
+            ? []
+            : [
+                "Activity",
+                "Groups",
+                ...(currency !== undefined
+                  ? [{ type: "Dashboard" as const, id: groupId }]
+                  : []),
+              ],
       }),
       removeGroupMember: builder.mutation<
         { success: true; message: string },
@@ -48,7 +110,9 @@ export const groupsApi = api
           method: "DELETE",
         }),
         invalidatesTags: (_result, error, { groupId }) =>
-          error ? [] : ["Groups", { type: "Dashboard", id: groupId }],
+          error
+            ? []
+            : ["Groups", "Activity", { type: "Dashboard", id: groupId }],
       }),
       addGroupMember: builder.mutation<
         AddGroupMemberResponse,
@@ -60,7 +124,9 @@ export const groupsApi = api
           body: { email: email.trim().toLowerCase() },
         }),
         invalidatesTags: (_result, error, { groupId }) =>
-          error ? [] : ["Groups", { type: "Dashboard", id: groupId }],
+          error
+            ? []
+            : ["Groups", "Activity", { type: "Dashboard", id: groupId }],
       }),
       getMyGroups: builder.query<GroupsResponse, void>({
         query: () => "/groups",

@@ -1,3 +1,4 @@
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal";
 import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -36,12 +37,18 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
   function amount(value: number) {
     return `${group?.currency ? `${group.currency} ` : ""}${formatCurrencyAmount(value, group?.currency)}`;
   }
+  function closeDelete() {
+    if (deleteLock.current || deleting) return;
+    setConfirmDelete(false);
+    setMessage("");
+  }
   async function remove() {
-    if (deleteLock.current || !bill || bill.status === "PAID" || isFetching) return;
+    if (deleteLock.current || !confirmDelete || !bill || bill.status === "PAID" || bill.paymentPending || isFetching) return;
     deleteLock.current = true;
     setMessage("");
     try {
       await deleteBill({ groupId, billId }).unwrap();
+      setConfirmDelete(false);
       router.navigate({ pathname: "/groups/[groupId]/bills", params: { groupId, status: "", filterRequest: String(Date.now()) } });
     } catch (cause) {
       setMessage(authError(cause, "Could not delete the bill. Try again."));
@@ -115,16 +122,6 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
             ) : <View className="gap-3">
               <Button disabled={deleting || isFetching} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/pay", params: { groupId, billId } })}><Text>{bill.paymentPending?"Finish saved payment":"Mark as paid"}</Text></Button>
               {bill.paymentPending?<Text className="text-sm text-muted-foreground">Payment is processing. Its saved payer and split are locked; retry to finish safely.</Text>:null}
-              {confirmDelete ? (
-                <View className="gap-4 rounded-[24px] border border-border bg-card p-5">
-                  <Text className="font-semibold">Delete this bill?</Text>
-                  <Text>Delete “{bill.name}” ({amount(bill.amount)})? This cannot be undone.</Text>
-                  <Text className="text-sm text-muted-foreground">{bill.isRecurring ? "This stops future generation. Bills already generated remain unchanged." : bill.recurrenceSourceId ? "Only this occurrence will be removed. The recurring schedule continues." : "This removes the bill from your group."}</Text>
-                  {message ? <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">{message}</Text> : null}
-                  <Button variant="destructive" disabled={deleting || isFetching} onPress={() => void remove()}><Text>{deleting ? "Deleting…" : "Confirm delete"}</Text></Button>
-                  <Button variant="outline" disabled={deleting} onPress={() => { setConfirmDelete(false); setMessage(""); }}><Text>Cancel</Text></Button>
-                </View>
-              ) : (
                 <View className="flex-row flex-wrap gap-3">
                   <Button className="flex-1" disabled={deleting || isFetching || bill.paymentPending} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/edit", params: { groupId, billId } })}>
                     <Ionicons name="create-outline" size={18} color={colors.primaryForeground} accessible={false} /><Text>Edit</Text>
@@ -133,11 +130,26 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
                     <Ionicons name="trash-outline" size={18} color={colors.destructive} accessible={false} /><Text className="text-destructive">Delete</Text>
                   </Button>
                 </View>
-              )}
             </View>}
           </>
         )}
       </ScrollView>
+      <DeleteConfirmationModal
+        visible={confirmDelete && !!bill && bill.status !== "PAID" && !bill.paymentPending}
+        title="Delete bill?"
+        name={bill?.name ?? ""}
+        detail={bill ? amount(bill.amount) : ""}
+        message={message}
+        busy={deleting}
+        disabled={isFetching}
+        confirmLabel="Delete bill"
+        cancelLabel="Keep bill"
+        onClose={closeDelete}
+        onConfirm={() => void remove()}
+      >
+        <Text className="text-sm text-muted-foreground">This cannot be undone.</Text>
+        <Text className="text-sm text-muted-foreground">{bill?.isRecurring ? "This stops future generation. Bills already generated remain unchanged." : bill?.recurrenceSourceId ? "Only this occurrence will be removed. The recurring schedule continues." : "This removes the bill from your group."}</Text>
+      </DeleteConfirmationModal>
     </SafeAreaView>
   );
 }

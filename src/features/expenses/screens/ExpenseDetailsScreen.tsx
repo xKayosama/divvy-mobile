@@ -1,3 +1,4 @@
+import { DeleteExpenseModal } from "../components/DeleteExpenseModal";
 import { ExpenseSchedule } from "../components/ExpenseSchedule";
 import { formatCurrencyAmount } from "@/features/groups/money";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
@@ -36,12 +37,18 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
   function amount(value: number) {
     return `${group?.currency ? `${group.currency} ` : ""}${formatCurrencyAmount(value, group?.currency)}`;
   }
+  function closeDelete() {
+    if (deleteLock.current || deleting) return;
+    setConfirmDelete(false);
+    setMessage("");
+  }
   async function remove() {
-    if (deleteLock.current || !expense || isFetching) return;
+    if (deleteLock.current || !confirmDelete || !expense || expense.billId || isFetching) return;
     deleteLock.current = true;
     setMessage("");
     try {
       await deleteExpense({ groupId, expenseId }).unwrap();
+      setConfirmDelete(false);
       router.navigate({ pathname: "/groups/[groupId]/expenses", params: { groupId, category: "", startDate: "", endDate: "", filterRequest: String(Date.now()) } });
     } catch (cause) {
       setMessage(authError(cause, "Could not delete the expense. Try again."));
@@ -129,16 +136,7 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
             </View>
             <ExpenseSchedule key={`${expense._id}:${JSON.stringify(expense.recurring)}`} expense={expense} disabled={deleting || isFetching}/>
             <View className="gap-3">
-              {expense.billId?<View className="gap-3"><Text className="text-sm text-muted-foreground">This expense records a paid bill. It is included once in balances and spending and cannot be edited or deleted independently.</Text><Button variant="outline" onPress={()=>router.push({pathname:"/groups/[groupId]/bills/[billId]",params:{groupId,billId:expense.billId!}})}><Text>View linked bill</Text></Button></View>:confirmDelete ? (
-                <View className="gap-4 rounded-[24px] border border-border bg-card p-5">
-                  <Text className="font-semibold">Delete this expense?</Text>
-                  {expense.recurring ? <Text>Deleting the original also stops its recurring schedule. Existing occurrences remain.</Text> : null}
-                  <Text>Delete “{expense.description}” ({amount(expense.amount)})? This cannot be undone and will update group balances.</Text>
-                  {message ? <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">{message}</Text> : null}
-                  <Button variant="destructive" disabled={deleting || isFetching} onPress={() => void remove()}><Text>{deleting ? "Deleting…" : "Confirm delete"}</Text></Button>
-                  <Button variant="outline" disabled={deleting} onPress={() => { setConfirmDelete(false); setMessage(""); }}><Text>Cancel</Text></Button>
-                </View>
-              ) : (
+              {expense.billId?<View className="gap-3"><Text className="text-sm text-muted-foreground">This expense records a paid bill. It is included once in balances and spending and cannot be edited or deleted independently.</Text><Button variant="outline" onPress={()=>router.push({pathname:"/groups/[groupId]/bills/[billId]",params:{groupId,billId:expense.billId!}})}><Text>View linked bill</Text></Button></View>: (
                 <View className="flex-row flex-wrap gap-3">
                   <Button className="flex-1" disabled={deleting || isFetching} onPress={() => router.push({ pathname: "/groups/[groupId]/expenses/[expenseId]/edit", params: { groupId, expenseId } })}>
                     <Ionicons name="create-outline" size={18} color={colors.primaryForeground} accessible={false} /><Text>Edit</Text>
@@ -152,6 +150,17 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
           </>
         )}
       </ScrollView>
+      <DeleteExpenseModal
+        visible={confirmDelete && !!expense && !expense.billId}
+        description={expense?.description ?? ""}
+        amount={expense ? amount(expense.amount) : ""}
+        recurring={!!expense?.recurring}
+        deleting={deleting}
+        refreshing={isFetching}
+        message={message}
+        onClose={closeDelete}
+        onConfirm={() => void remove()}
+      />
     </SafeAreaView>
   );
 }

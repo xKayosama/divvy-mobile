@@ -10,7 +10,7 @@ import type {
 
 export const expensesApi = api
   .enhanceEndpoints({
-    addTagTypes: ["Expenses", "Dashboard"],
+    addTagTypes: ["Activity", "Expenses", "Dashboard"],
   })
   .injectEndpoints({
     endpoints: (builder) => ({
@@ -39,6 +39,7 @@ export const expensesApi = api
             : [
                 { type: "Expenses", id: groupId },
                 { type: "Expenses", id: `expense:${expenseId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -57,6 +58,7 @@ export const expensesApi = api
             : [
                 { type: "Expenses", id: groupId },
                 { type: "Expenses", id: `expense:${expenseId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -74,6 +76,7 @@ export const expensesApi = api
             : [
                 { type: "Expenses", id: groupId },
                 { type: "Expenses", id: `expense:${expenseId}` },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
@@ -110,6 +113,7 @@ export const expensesApi = api
             ? []
             : [
                 { type: "Expenses", id: groupId },
+                "Activity",
                 { type: "Dashboard", id: groupId },
               ],
       }),
