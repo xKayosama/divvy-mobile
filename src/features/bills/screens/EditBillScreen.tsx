@@ -19,7 +19,7 @@ export default function EditBillScreen({
     { refetchOnMountOrArgChange: true },
   );
   const bill = currentData?.data.bill;
-  if (bill && bill.groupId === groupId && bill.status !== "PAID" && !isError) {
+  if (bill && bill.groupId === groupId && bill.status !== "PAID" && !bill.paymentPending && !isError) {
     return <CreateBillScreen key={billId} groupId={groupId} bill={bill} />;
   }
   return (
@@ -29,7 +29,7 @@ export default function EditBillScreen({
         {isFetching ? (
           <ActivityIndicator accessibilityLabel="Loading bill" />
         ) : (
-          isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} /> : <ContentState icon="lock-closed-outline" title={bill?.groupId === groupId ? "Paid bill locked" : "Bill unavailable"} description={bill?.groupId === groupId ? "Paid bills cannot be edited or deleted." : "This bill does not belong to the selected group."} />
+          isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} /> : <ContentState icon="lock-closed-outline" title={bill?.groupId === groupId ? bill.paymentPending ? "Payment processing" : "Paid bill locked" : "Bill unavailable"} description={bill?.groupId === groupId ? bill.paymentPending ? "Finish the saved payment from bill details before making other changes." : "Paid bills cannot be edited or deleted." : "This bill does not belong to the selected group."} />
         )}
         <Button
           variant="ghost"
@@ -40,7 +40,7 @@ export default function EditBillScreen({
             })
           }
         >
-          <Text>Back to bills</Text>
+          <Text>Back to upcoming bills</Text>
         </Button>
       </View>
     </SafeAreaView>

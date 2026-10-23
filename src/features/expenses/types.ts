@@ -75,6 +75,7 @@ export type Expense = {
   date: string;
   notes: string;
   recurring?: ExpenseSchedule;
+  billId?: string | null;
   recurrenceSourceId?: string | null;
   occurrenceNumber?: number;
   createdAt: string;

@@ -129,7 +129,7 @@ export default function ExpenseDetailsScreen({ groupId, expenseId }: { groupId: 
             </View>
             <ExpenseSchedule key={`${expense._id}:${JSON.stringify(expense.recurring)}`} expense={expense} disabled={deleting || isFetching}/>
             <View className="gap-3">
-              {confirmDelete ? (
+              {expense.billId?<View className="gap-3"><Text className="text-sm text-muted-foreground">This expense records a paid bill. It is included once in balances and spending and cannot be edited or deleted independently.</Text><Button variant="outline" onPress={()=>router.push({pathname:"/groups/[groupId]/bills/[billId]",params:{groupId,billId:expense.billId!}})}><Text>View linked bill</Text></Button></View>:confirmDelete ? (
                 <View className="gap-4 rounded-[24px] border border-border bg-card p-5">
                   <Text className="font-semibold">Delete this expense?</Text>
                   {expense.recurring ? <Text>Deleting the original also stops its recurring schedule. Existing occurrences remain.</Text> : null}

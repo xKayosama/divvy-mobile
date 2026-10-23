@@ -197,6 +197,7 @@ export default function HomeScreen() {
                   Paid bills: {data.data.bills.paid} ·{" "}
                   {group?.currency ? `${group.currency} ` : ""}{formatAmount(data.data.bills.paidAmount)}
                 </Text>
+                <Text className="text-xs text-muted-foreground">Linked bill payments are already included in spending.</Text>
                 <Button
                   variant="outline"
                   accessibilityLabel={`View paid bills, ${data.data.bills.paid} bills`}
@@ -205,7 +206,7 @@ export default function HomeScreen() {
                     params: { groupId, status: "PAID", filterRequest: String(Date.now()) },
                   })}
                 >
-                  <Text>View paid bills</Text>
+                  <Text>View bill history</Text>
                   <Ionicons name="arrow-forward" size={18} color={colors.primary} accessible={false} />
                 </Button>
               </View>

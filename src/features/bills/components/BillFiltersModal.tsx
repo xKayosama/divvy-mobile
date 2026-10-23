@@ -11,8 +11,9 @@ import type { GetBillsRequest } from "../types";
 
 export type BillFilters = Pick<GetBillsRequest, "category" | "status" | "isRecurring">;
 
-export default function BillFiltersModal({ filters, onApply, onClose }: {
+export default function BillFiltersModal({ filters, onApply, onClose, view = "upcoming" }: {
   filters: BillFilters;
+  view?: "upcoming"|"history";
   onApply: (value: BillFilters) => void;
   onClose: () => void;
 }) {
@@ -24,20 +25,21 @@ export default function BillFiltersModal({ filters, onApply, onClose }: {
         <SafeAreaView className="flex-1 bg-background">
           <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
             <View className="flex-row items-center gap-3">
-              <Button variant="outline" size="icon" accessibilityLabel="Back to bills" onPress={onClose}>
+              <Button variant="outline" size="icon" accessibilityLabel="Back to upcoming bills" onPress={onClose}>
                 <Ionicons name="chevron-back" size={22} color={colors.foreground} accessible={false} />
               </Button>
               <Text accessibilityRole="header" className="flex-1 text-3xl font-semibold">Filter bills</Text>
             </View>
             <CategorySelector inline value={draft.category} options={billCategoryOptions} onChange={category => setDraft({ ...draft, category })} onClear={() => setDraft({ ...draft, category: undefined })} />
-            <Text className="font-semibold">Status</Text>
+            {view==="upcoming" ? <><Text className="font-semibold">Status</Text>
             <View className="flex-row flex-wrap gap-2">
-              {([undefined, "PENDING", "PAID", "OVERDUE"] as const).map((status) => (
+              {([undefined, "PENDING", "OVERDUE"] as const).map((status) => (
                 <Button key={status ?? "all"} variant={draft.status === status ? "default" : "outline"} accessibilityState={{ selected: draft.status === status }} onPress={() => setDraft({ ...draft, status })}>
-                  <Text className="capitalize">{status?.toLowerCase() ?? "All statuses"}</Text>
+                  <Text className="capitalize">{status?.toLowerCase() ?? "All unpaid"}</Text>
                 </Button>
               ))}
             </View>
+            </>:<Text className="text-sm text-muted-foreground">History shows paid bills only.</Text>}
             <Text className="font-semibold">Repeat</Text>
             <View className="flex-row flex-wrap gap-2">
               {([undefined, true, false] as const).map((isRecurring) => (

@@ -44,6 +44,7 @@ export default function GroupListScreen() {
               <Ionicons name="add" size={22} color={colors.primaryForeground} accessible={false} />
               <Text className="font-semibold">Create group</Text>
             </Button>
+            <Button variant="outline" onPress={()=>router.push("/groups/deleted")}><Ionicons name="archive-outline" size={20} color={colors.primary} accessible={false}/><Text>Deleted groups</Text></Button>
             {isError ? (
               <QueryErrorState error={error} subject="Groups" busy={isFetching} onRetry={() => void refetch()} />
             ) : data ? <Text className="text-xs text-muted-foreground">{data.data.groups.length} {data.data.groups.length === 1 ? "group" : "groups"}</Text> : null}

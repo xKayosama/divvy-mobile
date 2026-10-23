@@ -90,8 +90,8 @@ export default function CreateBillScreen({
     Keyboard.dismiss();
     submitting.current = true;
     try {
-      if (bill?.status === "PAID") {
-        setMessage("Paid bills cannot be edited.");
+      if (bill?.status === "PAID" || bill?.paymentPending) {
+        setMessage("Paid bills and payments in progress cannot be edited.");
         return;
       }
       const body: CreateBillRequest = {
@@ -133,7 +133,7 @@ export default function CreateBillScreen({
               <Button
                 variant="outline"
                 size="icon"
-                accessibilityLabel="Back to bills"
+                accessibilityLabel="Back to upcoming bills"
                 disabled={saving}
                 onPress={back}
               >

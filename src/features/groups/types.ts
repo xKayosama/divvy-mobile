@@ -97,3 +97,5 @@ export type GroupDetailsResponse = {
     };
   };
 };
+
+export type DeletedGroupsResponse = {success:true;data:{groups:{id:string;name:string;currency:string;icon?:string;role:"OWNER";deletedAt:string}[]}};

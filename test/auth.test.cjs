@@ -434,15 +434,15 @@ for (const operation of ["createBill", "markBillPaid"]) {
           request.url,
           operation === "createBill"
             ? "https://divvy.test/api/groups/g1/bills"
-            : "https://divvy.test/api/bills/b1",
+            : "https://divvy.test/api/bills/b1/pay",
         );
         assert.equal(
           request.method,
-          operation === "createBill" ? "POST" : "PUT",
+          "POST",
         );
         assert.deepEqual(
           await request.json(),
-          operation === "createBill" ? body : { status: "PAID", paidBy: "u1" },
+          operation === "createBill" ? body : { paidBy: "u1", splitType: "EQUAL", participants: [{userId:"u1"}] },
         );
         return respond(operation === "createBill" ? 201 : 200, {
           success: true,
@@ -475,8 +475,7 @@ for (const operation of ["createBill", "markBillPaid"]) {
           billsApi.endpoints[operation].initiate({
             groupId: "g1",
             billId: "b1",
-            paidBy: "u1",
-            body,
+            body: operation === "createBill" ? body : {paidBy:"u1",splitType:"EQUAL",participants:[{userId:"u1"}]},
           }),
         )
         .unwrap();
@@ -523,7 +522,7 @@ test("bill payment failure preserves cached bills and session for retry", async 
           billsApi.endpoints.markBillPaid.initiate({
             groupId: "g1",
             billId: "b1",
-            paidBy: "u2",
+            body: {paidBy:"u2",splitType:"EQUAL",participants:[{userId:"u2"}]},
           }),
         )
         .unwrap(),
@@ -1325,10 +1324,10 @@ test("bill search and filters combine, preserve false and use distinct page/sear
   const args = [filters, { ...filters, page: 2 }, { ...filters, search: "Wifi", isRecurring: true }, { groupId: "g1" }];
   for (const arg of args) await store.dispatch(billsApi.endpoints.getGroupBills.initiate(arg, { subscribe: false })).unwrap();
   assert.deepEqual(requests, [
-    { page: "1", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
-    { page: "2", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
-    { page: "1", limit: "10", search: "Wifi", category: "INTERNET", status: "PENDING", isRecurring: "true" },
-    { page: "1", limit: "10" },
+    { view: "upcoming", page: "1", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
+    { view: "upcoming", page: "2", limit: "10", search: "Internet + phone", category: "INTERNET", status: "PENDING", isRecurring: "false" },
+    { view: "upcoming", page: "1", limit: "10", search: "Wifi", category: "INTERNET", status: "PENDING", isRecurring: "true" },
+    { view: "upcoming", page: "1", limit: "10" },
   ]);
   for (const [index, arg] of args.entries()) assert.equal(billsApi.endpoints.getGroupBills.select(arg)(store.getState()).data.data.bills[0]._id, JSON.stringify(requests[index]));
 });
@@ -1362,9 +1361,9 @@ test("paying a reminder bill refreshes dashboard reminder counts and previews", 
   let reads = 0;
   global.fetch = async (request) => {
     const url = new URL(request.url);
-    if (request.method === "PUT") {
-      assert.equal(url.pathname, "/api/bills/b1");
-      assert.deepEqual(await request.json(), { status: "PAID", paidBy: "u1" });
+    if (request.method === "POST") {
+      assert.equal(url.pathname, "/api/bills/b1/pay");
+      assert.deepEqual(await request.json(), {paidBy:"u1",splitType:"EQUAL",participants:[{userId:"u1"}]});
       paid = true;
       return respond(200, { success: true, data: { bill: { _id: "b1", status: "PAID" } } });
     }
@@ -1380,7 +1379,7 @@ test("paying a reminder bill refreshes dashboard reminder counts and previews", 
   const query = store.dispatch(dashboardApi.endpoints.getGroupDashboard.initiate("g1"));
   try {
     assert.equal((await query.unwrap()).data.billReminders.overdue.count, 1);
-    await store.dispatch(billsApi.endpoints.markBillPaid.initiate({ groupId: "g1", billId: "b1", paidBy: "u1" })).unwrap();
+    await store.dispatch(billsApi.endpoints.markBillPaid.initiate({ groupId: "g1", billId: "b1", body:{paidBy:"u1",splitType:"EQUAL",participants:[{userId:"u1"}]} })).unwrap();
     await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(item => item.unwrap()));
     const result = dashboardApi.endpoints.getGroupDashboard.select("g1")(store.getState());
     assert.equal(reads, 2);
@@ -1680,4 +1679,71 @@ test("schedule conflicts preserve the signed-in session and surface a retryable 
   global.fetch = async () => respond(409, { success: false, message: "Schedule is processing. Try again shortly." });
   await assert.rejects(store.dispatch(expensesApi.endpoints.updateExpenseRecurrence.initiate({ groupId: "g1", expenseId: "e", body: { paused: true } })).unwrap(), error => error.status === 409);
   assert.ok(store.getState().auth.token);
+});
+
+test("bill payment refreshes expense lists and preserves reciprocal links on replay", async()=>{
+ signedIn();
+ let paid=false;const writes=[];let reads=0;
+ const expense={_id:"linked1",billId:"billLinked",groupId:"gLink",amount:100,paidBy:{_id:"u1"},splitType:"EQUAL",participants:[{userId:{_id:"u1"},amount:50},{userId:{_id:"u2"},amount:50}]};
+ global.fetch=async request=>{
+  if(request.method==="POST"){
+   assert.equal(new URL(request.url).pathname,"/api/bills/billLinked/pay");writes.push(await request.json());paid=true;
+   return respond(200,{success:true,data:{bill:{_id:"billLinked",groupId:"gLink",status:"PAID",expenseId:"linked1"},expense}});
+  }
+  reads++;return respond(200,{success:true,data:{expenses:paid?[expense]:[]},pagination:{page:1,total:paid?1:0}});
+ };
+ const query=store.dispatch(expensesApi.endpoints.getGroupExpenses.initiate({groupId:"gLink"}));
+ const body={paidBy:"u1",splitType:"SHARES",participants:[{userId:"u1",shares:2},{userId:"u2",shares:1}]};
+ try{
+  await query.unwrap();
+  for(let i=0;i<2;i++){
+   const result=await store.dispatch(billsApi.endpoints.markBillPaid.initiate({groupId:"gLink",billId:"billLinked",body})).unwrap();
+   assert.equal(result.data.bill.expenseId,result.data.expense._id);assert.equal(result.data.expense.billId,"billLinked");
+   await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query=>query.unwrap()));
+  }
+  assert.equal(reads,3);assert.deepEqual(writes,[body,body]);
+  assert.equal(expensesApi.endpoints.getGroupExpenses.select({groupId:"gLink"})(store.getState()).data.data.expenses.length,1);
+ }finally{query.unsubscribe();}
+});
+test("pending bill payments can be finished with the saved settings without a new payer selection", async()=>{
+ signedIn();let calls=0;
+ global.fetch=async request=>{calls++;assert.deepEqual(await request.json(),{resume:true});return respond(200,{success:true,data:{bill:{_id:"bResume",status:"PAID",expenseId:"eResume"}}});};
+ const result=await store.dispatch(billsApi.endpoints.markBillPaid.initiate({groupId:"gResume",billId:"bResume",body:{resume:true}})).unwrap();
+ assert.equal(result.data.bill.expenseId,"eResume");assert.equal(calls,1);
+});
+
+test("upcoming and history requests stay separate and PAID dashboard shortcuts open history",async()=>{
+ signedIn();const requests=[];
+ global.fetch=async request=>{const params=Object.fromEntries(new URL(request.url).searchParams);requests.push(params);return respond(200,{success:true,data:{bills:[{_id:params.view}]}});};
+ const cases=[{groupId:"gViews"},{groupId:"gViews",view:"history"},{groupId:"gViews",view:"upcoming",status:"OVERDUE"},{groupId:"gViews",status:"PAID"}];
+ for(const args of cases) await store.dispatch(billsApi.endpoints.getGroupBills.initiate(args,{subscribe:false})).unwrap();
+ assert.deepEqual(requests.map(item=>item.view),["upcoming","history","upcoming","history"]);
+ assert.equal(requests[2].status,"OVERDUE");assert.equal(requests[3].status,"PAID");
+ assert.equal(billsApi.endpoints.getGroupBills.select(cases[0])(store.getState()).data.data.bills[0]._id,"upcoming");
+ assert.equal(billsApi.endpoints.getGroupBills.select(cases[1])(store.getState()).data.data.bills[0]._id,"history");
+});
+
+test("soft-delete and restore use separate group actions, preserving the permanent-delete contract",async()=>{
+ signedIn();let hidden=false;let activeReads=0;let deletedReads=0;const writes=[];
+ global.fetch=async request=>{
+  const path=new URL(request.url).pathname;
+  if(request.method==='POST'){writes.push(path);hidden=path.endsWith('/soft-delete');return respond(200,{success:true,message:'Updated'});}
+  const deleted=path.endsWith('/deleted');if(deleted)deletedReads++;else activeReads++;
+  return respond(200,{success:true,data:{groups:(deleted?hidden:!hidden)?[{id:'gSoft',name:'Trip',role:'OWNER'}]:[]}});
+ };
+ const active=store.dispatch(groupsApi.endpoints.getMyGroups.initiate());
+ const deleted=store.dispatch(groupsApi.endpoints.getDeletedGroups.initiate());
+ try{
+  await Promise.all([active.unwrap(),deleted.unwrap()]);
+  await store.dispatch(groupsApi.endpoints.softDeleteGroup.initiate('gSoft')).unwrap();
+  await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query=>query.unwrap()));
+  assert.equal(groupsApi.endpoints.getMyGroups.select()(store.getState()).data.data.groups.length,0);
+  assert.equal(groupsApi.endpoints.getDeletedGroups.select()(store.getState()).data.data.groups.length,1);
+  await store.dispatch(groupsApi.endpoints.restoreGroup.initiate('gSoft')).unwrap();
+  await Promise.all(store.dispatch(api.util.getRunningQueriesThunk()).map(query=>query.unwrap()));
+  assert.equal(groupsApi.endpoints.getMyGroups.select()(store.getState()).data.data.groups.length,1);
+  assert.equal(groupsApi.endpoints.getDeletedGroups.select()(store.getState()).data.data.groups.length,0);
+  assert.deepEqual(writes,['/api/groups/gSoft/soft-delete','/api/groups/gSoft/restore']);
+  assert.equal(activeReads,3);assert.equal(deletedReads,3);
+ }finally{active.unsubscribe();deleted.unsubscribe();}
 });

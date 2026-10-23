@@ -58,14 +58,14 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
         refreshControl={<RefreshControl refreshing={isFetching && !!bill} onRefresh={() => { if (!isFetching && !deleting) void refetch(); }} tintColor={colors.primary} colors={[colors.primary]} />}
       >
         <View className="flex-row items-center gap-3">
-          <Button variant="outline" size="icon" accessibilityLabel="Back to bills" disabled={deleting} onPress={back}>
+          <Button variant="outline" size="icon" accessibilityLabel="Back to upcoming bills" disabled={deleting} onPress={back}>
             <Ionicons name="chevron-back" size={22} color={colors.foreground} accessible={false} />
           </Button>
           <Text accessibilityRole="header" className="flex-1 text-2xl font-semibold">Bill details</Text>
         </View>
         {!bill ? (
           isFetching ? <View className="items-center gap-3 py-12"><ActivityIndicator color={colors.primary} /><Text>Loading bill…</Text></View> : (
-            isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} onBack={back} backLabel="Back to bills" /> : <ContentState icon="lock-closed-outline" title="Bill unavailable" description="This bill does not belong to the selected group." actionLabel="Back to bills" onAction={back} />
+            isError ? <QueryErrorState error={error} subject="Bill" onRetry={() => void refetch()} onBack={back} backLabel="Back to upcoming bills" /> : <ContentState icon="lock-closed-outline" title="Bill unavailable" description="This bill does not belong to the selected group." actionLabel="Back to upcoming bills" onAction={back} />
           )
         ) : (
           <>
@@ -100,6 +100,7 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
                 </View>
                 <Text className="text-sm text-muted-foreground">{bill.paidAt && Number.isFinite(new Date(bill.paidAt).getTime()) ? new Date(bill.paidAt).toLocaleString("en-PH", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Payment date unavailable"}</Text>
                 <Text className="text-xs text-muted-foreground">This is when payment was recorded.</Text>
+                {bill.expenseId ? <><Text className="text-sm text-muted-foreground">Included once in spending and balances through its linked expense.</Text><Button variant="outline" onPress={()=>router.push({pathname:"/groups/[groupId]/expenses/[expenseId]",params:{groupId,expenseId:bill.expenseId!}})}><Text>View linked expense</Text></Button></> : <Text className="text-sm text-muted-foreground">This older payment has no linked expense and does not affect member balances. Check existing expenses before adding anything manually.</Text>}
               </View>
             ) : null}
             <View className="gap-2 rounded-[24px] bg-card p-5" style={surfaces.card}>
@@ -112,7 +113,8 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
                 <Text className="flex-1 text-sm text-muted-foreground">Paid bills cannot be edited or deleted.</Text>
               </View>
             ) : <View className="gap-3">
-              <Button disabled={deleting || isFetching} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/pay", params: { groupId, billId } })}><Text>Mark as paid</Text></Button>
+              <Button disabled={deleting || isFetching} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/pay", params: { groupId, billId } })}><Text>{bill.paymentPending?"Finish saved payment":"Mark as paid"}</Text></Button>
+              {bill.paymentPending?<Text className="text-sm text-muted-foreground">Payment is processing. Its saved payer and split are locked; retry to finish safely.</Text>:null}
               {confirmDelete ? (
                 <View className="gap-4 rounded-[24px] border border-border bg-card p-5">
                   <Text className="font-semibold">Delete this bill?</Text>
@@ -124,10 +126,10 @@ export default function BillDetailsScreen({ groupId, billId }: { groupId: string
                 </View>
               ) : (
                 <View className="flex-row flex-wrap gap-3">
-                  <Button className="flex-1" disabled={deleting || isFetching} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/edit", params: { groupId, billId } })}>
+                  <Button className="flex-1" disabled={deleting || isFetching || bill.paymentPending} onPress={() => router.push({ pathname: "/groups/[groupId]/bills/[billId]/edit", params: { groupId, billId } })}>
                     <Ionicons name="create-outline" size={18} color={colors.primaryForeground} accessible={false} /><Text>Edit</Text>
                   </Button>
-                  <Button variant="outline" className="flex-1" disabled={deleting || isFetching} onPress={() => { setConfirmDelete(true); setMessage(""); }}>
+                  <Button variant="outline" className="flex-1" disabled={deleting || isFetching || bill.paymentPending} onPress={() => { if(bill.paymentPending)return; setConfirmDelete(true); setMessage(""); }}>
                     <Ionicons name="trash-outline" size={18} color={colors.destructive} accessible={false} /><Text className="text-destructive">Delete</Text>
                   </Button>
                 </View>

@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import DateField from "@/components/ui/date-field";
+import { RecurrenceEndDateSelector } from "./RecurrenceEndDateSelector";
 import { FormMessage } from "@/components/auth/FormField";
 import { authError } from "@/features/auth/errors";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -23,6 +23,7 @@ export function ExpenseRepeatFields({
   onRepeat,
   onFrequency,
   onEndDate,
+  firstDate,
   disabled,
   error,
 }: {
@@ -32,6 +33,7 @@ export function ExpenseRepeatFields({
   onRepeat: (value: boolean) => void;
   onFrequency: (value: ExpenseFrequency) => void;
   onEndDate: (value: string) => void;
+  firstDate: string;
   disabled: boolean;
   error?: string;
 }) {
@@ -75,22 +77,13 @@ export function ExpenseRepeatFields({
               ),
             )}
           </View>
-          <DateField
-            label="End date (optional, inclusive)"
+          <RecurrenceEndDateSelector
             value={endDate}
             onChange={onEndDate}
+            firstDate={firstDate}
             disabled={disabled}
             error={error}
           />
-          {endDate ? (
-            <Button
-              variant="ghost"
-              disabled={disabled}
-              onPress={() => onEndDate("")}
-            >
-              <Text>No end date</Text>
-            </Button>
-          ) : null}
         </>
       ) : null}
     </View>
@@ -198,20 +191,15 @@ export function ExpenseSchedule({
         Resume skips missed dates and continues on the next future date. An
         occurrence already processing may finish before pause takes effect.
       </Text>
-      <DateField
-        label="End date (optional, inclusive)"
+      <RecurrenceEndDateSelector
         value={end}
         onChange={(value) => {
           setEnd(value);
           setMessage("");
         }}
+        firstDate={schedule.anchor}
         disabled={busy}
       />
-      {end ? (
-        <Button variant="ghost" disabled={busy} onPress={() => setEnd("")}>
-          <Text>No end date</Text>
-        </Button>
-      ) : null}
       <Button
         variant="outline"
         disabled={busy || end === (schedule.endDate?.slice(0, 10) ?? "")}

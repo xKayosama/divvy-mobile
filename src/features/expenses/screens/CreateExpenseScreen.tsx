@@ -998,7 +998,7 @@ export default function CreateExpenseScreen({
                   disabled={saving || !!expense?.recurring}
                 />
                 {expense?.recurring ? <Text className="text-sm text-muted-foreground">The first date anchors this schedule. Other edits apply to future entries; manage pause and end dates in expense details.</Text> : null}
-                {!expense ? <ExpenseRepeatFields repeat={repeat} frequency={frequency} endDate={recurrenceEnd} onRepeat={setRepeat} onFrequency={setFrequency} onEndDate={setRecurrenceEnd} disabled={saving} error={fieldErrors.recurrenceEnd}/> : null}
+                {!expense ? <ExpenseRepeatFields firstDate={date} repeat={repeat} frequency={frequency} endDate={recurrenceEnd} onRepeat={setRepeat} onFrequency={setFrequency} onEndDate={(value)=>{setRecurrenceEnd(value);setFieldErrors({});setMessage("");}} disabled={saving} error={fieldErrors.recurrenceEnd}/> : null}
 
                 <FormField
                   label="Notes"

@@ -1,4 +1,23 @@
-export type BillSort = "due_soonest" | "due_latest" | "amount_high" | "amount_low";
+export type BillPaymentSplit = "EQUAL" | "EXACT" | "PERCENTAGE" | "SHARES";
+export type BillPaymentRequest =
+  | { resume: true }
+  | ({ paidBy: string } & (
+      | { splitType: "EQUAL"; participants: { userId: string }[] }
+      | {
+          splitType: "EXACT";
+          participants: { userId: string; amount: number }[];
+        }
+      | {
+          splitType: "PERCENTAGE";
+          participants: { userId: string; percentage: number }[];
+        }
+      | {
+          splitType: "SHARES";
+          participants: { userId: string; shares: number }[];
+        }
+    ));
+export type BillSort =
+  "due_soonest" | "due_latest" | "amount_high" | "amount_low";
 
 export type BillCategory =
   | "RENT"
@@ -37,7 +56,7 @@ export type BillResponse = {
   code: number;
   success: true;
   message: string;
-  data: { bill: Bill };
+  data: { bill: Bill; expense?: { _id: string; billId: string } };
 };
 
 export type Bill = {
@@ -58,6 +77,8 @@ export type Bill = {
     email: string;
     avatar: string | null;
   } | null;
+  expenseId?: string | null;
+  paymentPending?: boolean;
   paidAt?: string | null;
   recurrenceSourceId?: string | null;
   occurrenceNumber?: number;
@@ -67,6 +88,7 @@ export type Bill = {
 };
 
 export type GetBillsRequest = {
+  view?: "upcoming" | "history";
   groupId: string;
   page?: number;
   limit?: number;

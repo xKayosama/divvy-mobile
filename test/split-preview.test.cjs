@@ -95,3 +95,13 @@ test("recurring end dates validate real calendar dates and cannot precede the or
   assert.equal(validateRecurrenceEnd("2028-02-29", "2026-10-22"), "");
   for (const end of ["2026-02-29", "2026-10-21", "2026-13-01", "bad"]) assert.ok(validateRecurrenceEnd(end, "2026-10-22"));
 });
+
+test("bill payment splits produce valid native-currency requests and reject incomplete allocation", () => {
+  const { billPaymentBody } = require("../src/features/bills/paymentForm.ts");
+  assert.deepEqual(billPaymentBody(100,"PHP","a","EQUAL",["a","b"],{}).body,{paidBy:"a",splitType:"EQUAL",participants:[{userId:"a"},{userId:"b"}]});
+  assert.deepEqual(billPaymentBody(.003,"KWD","a","SHARES",["a","b"],{a:"2",b:"1"}).body.participants,[{userId:"a",shares:2},{userId:"b",shares:1}]);
+  assert.deepEqual(billPaymentBody(100,"JPY","a","EXACT",["a","b"],{a:"60",b:"40"}).body.participants,[{userId:"a",amount:60},{userId:"b",amount:40}]);
+  assert.deepEqual(billPaymentBody(100,"PHP","a","PERCENTAGE",["a","b"],{a:"25",b:"75"}).body.participants,[{userId:"a",percentage:25},{userId:"b",percentage:75}]);
+  for(const [type,values] of [["EXACT",{a:"99",b:"0"}],["PERCENTAGE",{a:"40",b:"40"}],["SHARES",{a:"0",b:"1"}]])assert.ok(billPaymentBody(100,"PHP","a",type,["a","b"],values).error);
+  assert.ok(billPaymentBody(1,"JPY","a","EXACT",["a"],{a:"1.5"}).error);
+});

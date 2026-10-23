@@ -11,7 +11,7 @@ export default function GroupTabsLayout() {
     >
       <Tabs.Screen name="home" initialParams={{ groupId }} options={{ title: "Home" }} />
       <Tabs.Screen name="expenses" initialParams={{ groupId }} options={{ title: "Expenses" }} />
-      <Tabs.Screen name="bills" initialParams={{ groupId }} options={{ title: "Bills" }} />
+      <Tabs.Screen name="bills" initialParams={{ groupId }} options={{ title: "Upcoming bills" }} />
       <Tabs.Screen name="group" initialParams={{ groupId }} options={{ title: "Group" }} />
       <Tabs.Screen name="profile" initialParams={{ groupId }} options={{ href: null, title: "Profile" }} />
     </Tabs>

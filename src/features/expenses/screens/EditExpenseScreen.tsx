@@ -12,6 +12,7 @@ export default function EditExpenseScreen({ groupId, expenseId }: { groupId: str
   const { currentData, isFetching, isError, error, refetch } = useGetExpenseQuery(expenseId, { refetchOnMountOrArgChange: true });
   const expense = currentData?.data.expense;
 
+  if(expense?.billId && expense.groupId===groupId && !isError) return <SafeAreaView className="flex-1 bg-background"><View className="gap-4 p-5"><Text className="text-xl font-semibold">Paid bill expense</Text><Text>This expense is linked to a paid bill and cannot be edited independently.</Text><Button onPress={()=>router.navigate({pathname:"/groups/[groupId]/bills/[billId]",params:{groupId,billId:expense.billId!}})}><Text>View linked bill</Text></Button></View></SafeAreaView>;
   if (expense && expense.groupId === groupId && !isError) {
     return <CreateExpenseScreen key={expenseId} groupId={groupId} expense={expense} />;
   }

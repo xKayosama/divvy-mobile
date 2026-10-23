@@ -24,7 +24,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<BillSort>("due_soonest");
+  const [sort, setSort] = useState<BillSort>(initialStatus==="PAID"?"due_latest":"due_soonest");
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
@@ -72,7 +72,9 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
 
   }
 
-  const [filters, setFilters] = useState<BillFilters>(initialStatus ? { status: initialStatus } : {});
+  const [view,setView]=useState<"upcoming"|"history">(initialStatus==="PAID"?"history":"upcoming");
+  const [filters, setFilters] = useState<BillFilters>(initialStatus && initialStatus!=="PAID" ? { status: initialStatus } : {});
+  function changeView(next:"upcoming"|"history") {setView(next);setFilters(current=>({...current,status:undefined}));setPage(1);setSort(next==="history"?"due_latest":"due_soonest");}
   const [showFilters, setShowFilters] = useState(false);
   const hasFilters = !!(
     filters.category ||
@@ -93,7 +95,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
 
   const { currentData: queryData, isFetching, isError, error, refetch } =
     useGetGroupBillsQuery(
-      { groupId, page, limit: 10, ...filters, sort, search: search || undefined },
+      { groupId, page, limit: 10, ...filters, view, sort, search: search || undefined },
       { skip: !groupId, refetchOnMountOrArgChange: true },
     );
 
@@ -125,7 +127,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
       <ScreenBackground />
       <View style={{ padding: 20, gap: 8 }}>
         <View className="flex-row items-center justify-between gap-2">
-          <Text className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">Bills</Text>
+          <Text className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">Upcoming bills</Text>
           <Button
             variant={showSearch ? "default" : "outline"}
             className="h-11 w-11 rounded-2xl p-0"
@@ -157,7 +159,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               accessible={false}
             />
           </Button>
-          <ListSortControl title="Bills" value={sort} defaultValue="due_soonest" options={[{ value: "due_soonest", label: "Nearest due date" },{ value: "due_latest", label: "Latest due date" },{ value: "amount_high", label: "Highest amount" },{ value: "amount_low", label: "Lowest amount" }]} onChange={value => { setSort(value); setPage(1); }} />
+          <ListSortControl title={view==="history"?"Bill history":"Upcoming bills"} value={sort} defaultValue={view==="history"?"due_latest":"due_soonest"} options={[{ value: "due_soonest", label: "Nearest due date" },{ value: "due_latest", label: "Latest due date" },{ value: "amount_high", label: "Highest amount" },{ value: "amount_low", label: "Lowest amount" }]} onChange={value => { setSort(value); setPage(1); }} />
         </View>
 
         <Text style={{ color: colors.mutedForeground }}>
@@ -225,6 +227,10 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
             ) : null}
           </View>
         </Animated.View>
+        <View className="flex-row gap-2">
+          <Button variant={view==="upcoming"?"default":"outline"} accessibilityRole="tab" accessibilityState={{selected:view==="upcoming"}} onPress={()=>changeView("upcoming")}><Text>Unpaid</Text></Button>
+          <Button variant={view==="history"?"default":"outline"} accessibilityRole="tab" accessibilityState={{selected:view==="history"}} onPress={()=>changeView("history")}><Ionicons name="time-outline" size={18} color={view==="history"?colors.primaryForeground:colors.primary} accessible={false}/><Text>History</Text></Button>
+        </View>
         {hasFilters ? (
           <Text className="text-xs text-muted-foreground">{[
             filters.category?.toLowerCase().replace(/_/g, " "), filters.status?.toLowerCase(),
@@ -233,7 +239,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
         ) : null}
         {pagination ? (
           <Text style={{ color: colors.mutedForeground }}>
-            {pagination.total} {pagination.total === 1 ? "bill" : "bills"}{" "}
+            {pagination.total} {view==="history"?"paid":"unpaid"} {pagination.total === 1 ? "bill" : "bills"}{" "}
             {hasCriteria ? "matching" : "recorded"}
           </Text>
         ) : null}
@@ -265,7 +271,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               <Text style={{ color: colors.foreground }}>{searchPending || search ? "Searching bills…" : "Loading bills…"}</Text>
             </View>
           ) : !isError ? (
-            <ContentState icon="calendar-outline" title={hasCriteria ? "No bills found" : "No bills yet"} description={hasCriteria ? "Try a different search or clear your filters to see more results." : "Add a bill to keep track of due dates and payments."} actionLabel={hasCriteria ? "Clear search and filters" : "Add bill"} onAction={() => { if (hasCriteria) { clearSearch(); applyFilters({}); } else router.push({ pathname: "/groups/[groupId]/bills/create", params: { groupId } }); }} />
+            <ContentState icon="calendar-outline" title={hasCriteria ? "No bills found" : view==="history"?"No paid bills yet":"You're all caught up"} description={hasCriteria ? "Try a different search or clear your filters to see more results." : view==="history"?"Paid bills will appear here after you record their payment.":"No unpaid bills. Paid bills are in History."} actionLabel={hasCriteria ? "Clear search and filters" : view==="history"?"View upcoming bills":"Add bill"} onAction={() => { if (hasCriteria) { clearSearch(); applyFilters({}); } else if(view==="history") changeView("upcoming"); else router.push({ pathname: "/groups/[groupId]/bills/create", params: { groupId } }); }} />
           ) : null
         }
         renderItem={({ item }) => (
@@ -353,6 +359,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
               </Text>
             ) : null}
 
+            {item.paymentPending ? <Text className="text-sm text-primary">Payment processing · Open to finish safely</Text> : null}
             {item.status === "PAID" ? (
               <View className="gap-2 rounded-2xl bg-secondary p-3">
                 <View className="flex-row items-center gap-2">
@@ -433,7 +440,7 @@ export default function BillsScreen({ groupId, initialStatus }: { groupId: strin
           ) : null
         }
       />
-      {showFilters ? <BillFiltersModal filters={filters} onApply={applyFilters} onClose={() => setShowFilters(false)} /> : null}
+      {showFilters ? <BillFiltersModal view={view} filters={filters} onApply={applyFilters} onClose={() => setShowFilters(false)} /> : null}
     </View>
   );
 }

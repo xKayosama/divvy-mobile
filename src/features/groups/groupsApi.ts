@@ -2,6 +2,7 @@ import type { GroupCurrency } from "./currencies";
 import type { GroupIcon } from "./groupIcons";
 import { api } from "@/services/api";
 import type {
+  DeletedGroupsResponse,
   CreateGroupRequest,
   CreateGroupResponse,
   GroupMembersResponse,
@@ -11,9 +12,18 @@ import type {
 } from "./types";
 
 export const groupsApi = api
-  .enhanceEndpoints({ addTagTypes: ["Groups", "Dashboard"] })
+  .enhanceEndpoints({ addTagTypes: ["Groups", "Dashboard", "Bills", "Expenses", "Settlements"] })
   .injectEndpoints({
     endpoints: (builder) => ({
+      getDeletedGroups: builder.query<DeletedGroupsResponse,void>({query:()=>"/groups/deleted",providesTags:["Groups"]}),
+      softDeleteGroup: builder.mutation<{success:true;message:string},string>({
+        query:id=>({url:`/groups/${encodeURIComponent(id)}/soft-delete`,method:"POST"}),
+        invalidatesTags:(_result,error)=>error?[]:["Groups","Dashboard","Bills","Expenses","Settlements"],
+      }),
+      restoreGroup: builder.mutation<{success:true;message:string},string>({
+        query:id=>({url:`/groups/${encodeURIComponent(id)}/restore`,method:"POST"}),
+        invalidatesTags:(_result,error)=>error?[]:["Groups","Dashboard","Bills","Expenses","Settlements"],
+      }),
       getGroupDetails: builder.query<GroupDetailsResponse, string>({
         query: (groupId) => `/groups/${encodeURIComponent(groupId)}`,
         providesTags: ["Groups"],
@@ -74,6 +84,9 @@ export const groupsApi = api
   });
 
 export const {
+  useGetDeletedGroupsQuery,
+  useSoftDeleteGroupMutation,
+  useRestoreGroupMutation,
   useGetMyGroupsQuery,
   useGetGroupDetailsQuery,
   useCreateGroupMutation,

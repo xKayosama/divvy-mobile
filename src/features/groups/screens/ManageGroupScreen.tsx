@@ -24,6 +24,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { authError } from "@/features/auth/errors";
 import { useAppSelector } from "@/hooks/redux";
 import {
+  useSoftDeleteGroupMutation,
   useGetGroupMembersQuery,
   useGetMyGroupsQuery,
   useGetGroupDetailsQuery,
@@ -89,7 +90,9 @@ export default function ManageGroupScreen({
   const [removeMember, { isLoading: removing }] =
     useRemoveGroupMemberMutation();
   const [renameGroup, { isLoading: renaming }] = useRenameGroupMutation();
-  const saving = removing || renaming;
+  const [softDelete,{isLoading:deletingGroup}]=useSoftDeleteGroupMutation();
+  const [confirmSoftDelete,setConfirmSoftDelete]=useState(false);
+  const saving = removing || renaming || deletingGroup;
   const unsaved = useUnsavedChanges(!done && !memberUserId && (currencyChanged || (name !== undefined && name !== group?.name) || (icon !== undefined && icon !== resolveGroupIcon(group?.icon).value)), saving);
 
   function back() {
@@ -384,6 +387,12 @@ export default function ManageGroupScreen({
                       : "Save changes"}
                 </Text>
               </Button>
+              {!memberUserId ? <View className="gap-3 rounded-2xl border border-destructive/30 p-4">
+                <Text className="font-semibold">Soft delete group</Text>
+                <Text className="text-sm text-muted-foreground">Hide this group for all members while preserving expenses, bills and payments. Restore it later from Deleted groups. Recurring expenses will stay paused after restoration.</Text>
+                {confirmSoftDelete ? <><Text>Move “{group.name}” to Deleted groups? Unsaved settings will not be saved.</Text><Button variant="destructive" disabled={saving||fetching} onPress={async()=>{try{await softDelete(groupId).unwrap();unsaved.complete(()=>router.navigate("/groups"));}catch(error){setMessage(authError(error,"Could not soft delete the group. Refresh and retry."));}}}><Text>{deletingGroup?"Deleting…":"Confirm soft delete"}</Text></Button><Button variant="outline" disabled={saving} onPress={()=>setConfirmSoftDelete(false)}><Text>Keep group</Text></Button></>:<Button variant="outline" disabled={saving||fetching} onPress={()=>setConfirmSoftDelete(true)}><Text className="text-destructive">Soft delete group</Text></Button>}
+              </View>:null}
+
             </>
           )}
           {!done ? (

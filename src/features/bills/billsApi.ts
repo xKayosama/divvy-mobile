@@ -1,5 +1,6 @@
 import { api } from "@/services/api";
 import type {
+  BillPaymentRequest,
   BillResponse,
   BillsResponse,
   CreateBillRequest,
@@ -8,7 +9,7 @@ import type {
 
 export const billsApi = api
   .enhanceEndpoints({
-    addTagTypes: ["Bills", "Dashboard"],
+    addTagTypes: ["Bills", "Dashboard", "Expenses"],
   })
   .injectEndpoints({
     // Replace stale query definitions when Metro reevaluates this module.
@@ -74,28 +75,48 @@ export const billsApi = api
       }),
       markBillPaid: builder.mutation<
         BillResponse,
-        { groupId: string; billId: string; paidBy: string }
+        { groupId: string; billId: string; body: BillPaymentRequest }
       >({
-        query: ({ billId, paidBy }) => ({
-          url: `/bills/${encodeURIComponent(billId)}`,
-          method: "PUT",
-          body: { status: "PAID", paidBy },
+        query: ({ billId, body }) => ({
+          url: `/bills/${encodeURIComponent(billId)}/pay`,
+          method: "POST",
+          body,
         }),
-        invalidatesTags: (_result, error, { groupId, billId }) =>
-          error
+        invalidatesTags: (result, error, { groupId, billId }) =>
+          error && error.status !== 409 && error.status !== 503
             ? []
             : [
                 { type: "Bills", id: groupId },
                 { type: "Bills", id: `bill:${billId}` },
                 { type: "Dashboard", id: groupId },
+                { type: "Expenses", id: groupId },
+                ...(result?.data.expense
+                  ? [
+                      {
+                        type: "Expenses" as const,
+                        id: `expense:${result.data.expense._id}`,
+                      },
+                    ]
+                  : []),
               ],
       }),
       getGroupBills: builder.query<BillsResponse, GetBillsRequest>({
-        query: ({ groupId, page = 1, limit = 10, status, category, search, isRecurring, sort }) => ({
+        query: ({
+          groupId,
+          page = 1,
+          limit = 10,
+          status,
+          view,
+          category,
+          search,
+          isRecurring,
+          sort,
+        }) => ({
           url: `/groups/${encodeURIComponent(groupId)}/bills`,
           params: {
             page,
             limit,
+            view: view ?? (status === "PAID" ? "history" : "upcoming"),
             ...(status ? { status } : {}),
             category,
             search,

@@ -13,7 +13,7 @@ type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tab
 const tabs = [
   { name: "home", label: "Home", icon: "home-outline", active: "home" },
   { name: "expenses", label: "Expenses", icon: "receipt-outline", active: "receipt" },
-  { name: "bills", label: "Bills", icon: "calendar-outline", active: "calendar" },
+  { name: "bills", label: "Upcoming bills", icon: "calendar-outline", active: "calendar" },
   { name: "group", label: "Group", icon: "people-outline", active: "people" },
 ] as const;
 
@@ -78,7 +78,7 @@ export default function GroupTabBar({ state, navigation, descriptors, groupId }:
                 style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingTop: 4 }}
               >
                 <Ionicons name={focused ? tab.active : tab.icon} size={23} color={color} accessible={false} />
-                <Text numberOfLines={1} style={{ color, fontSize: 11, fontWeight: focused ? "700" : "500" }}>{tab.label}</Text>
+                <Text numberOfLines={tab.name==="bills"?2:1} style={{ color, fontSize: 11, lineHeight:12, textAlign:"center", fontWeight: focused ? "700" : "500" }}>{tab.name==="bills"?"Upcoming\nbills":tab.label}</Text>
                 <View style={{ height: 3, width: 28, borderRadius: 2, backgroundColor: focused ? colors.primary : "transparent" }} />
               </Pressable>
             </Fragment>
