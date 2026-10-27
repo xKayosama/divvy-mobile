@@ -1,7 +1,9 @@
 import { resolveGroupIcon } from "../groupIcons";
 import { ContentState, QueryErrorState } from "@/components/ui/content-state";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+import { useGetInvitationsQuery } from "../invitationsApi";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -16,6 +18,10 @@ export default function GroupListScreen() {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
   const { data, isLoading, isFetching, isError, error, refetch } = useGetMyGroupsQuery();
+
+  const incoming = useGetInvitationsQuery(undefined, { refetchOnMountOrArgChange: true, pollingInterval: 30000 });
+  const { refetch: refreshInvitations } = incoming;
+  useFocusEffect(useCallback(() => { void refetch(); void refreshInvitations(); }, [refetch, refreshInvitations]));
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} className="flex-1 bg-background">
@@ -44,6 +50,7 @@ export default function GroupListScreen() {
               <Ionicons name="add" size={22} color={colors.primaryForeground} accessible={false} />
               <Text className="font-semibold">Create group</Text>
             </Button>
+            <Button variant="outline" onPress={() => router.push("/invitations")}><Ionicons name="mail-outline" size={20} color={colors.primary} accessible={false}/><Text>Invitations{incoming.currentData?.data.invitations.length ? ` (${incoming.currentData.data.invitations.length})` : ""}</Text></Button>
             <Button variant="outline" onPress={()=>router.push("/groups/deleted")}><Ionicons name="archive-outline" size={20} color={colors.primary} accessible={false}/><Text>Deleted groups</Text></Button>
             {isError ? (
               <QueryErrorState error={error} subject="Groups" busy={isFetching} onRetry={() => void refetch()} />

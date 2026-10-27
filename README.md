@@ -1,7 +1,7 @@
 # Divvy mobile
 
 An Expo / React Native app for shared expenses, targeting iOS, Android, and web.
-Authentication with email-code password reset, group listing/creation, member viewing, owner-only member addition/removal and group renaming, dashboards, and expense listing/creation/editing/deletion are implemented. Bills support creation, recurrence, payment recording, and editing/deletion of unpaid bills.
+Authentication with email-code password reset, group listing/creation, member viewing, owner-managed invitations with recipient acceptance, member removal and group renaming, dashboards, and expense listing/creation/editing/deletion are implemented. Bills support creation, recurrence, payment recording, and editing/deletion of unpaid bills.
 
 Settle up shows suggested repayments, records payments sent by the current member, and displays paginated payment history. Repayments update dashboard balances separately from purchase totals.
 
@@ -33,3 +33,5 @@ npm run lint
 npx tsc --noEmit
 npm run test:auth
 ```
+
+Group owners can invite an email from **Group → Invite members** and share the generated code. Recipients register/sign in with that email, open **Your groups → Invitations**, review the code, and accept or decline. No invitation email is sent.

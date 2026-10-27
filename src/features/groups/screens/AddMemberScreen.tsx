@@ -1,281 +1,99 @@
-import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  View,
-} from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import { ActivityIndicator, Keyboard, Platform, ScrollView, Share, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FormField, FormMessage } from "@/components/auth/FormField";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import type { AddGroupMemberResponse } from "../types";
+import { QueryErrorState } from "@/components/ui/content-state";
 import { authError } from "@/features/auth/errors";
 import { useAppSelector } from "@/hooks/redux";
 import { useTheme } from "@/theme/ThemeProvider";
-import {
-  useAddGroupMemberMutation,
-  useGetGroupMembersQuery,
-} from "../groupsApi";
+import { useGetGroupMembersQuery } from "../groupsApi";
+import { useCreateInvitationMutation, useGetGroupInvitationsQuery, useRevokeInvitationMutation, type Invitation } from "../invitationsApi";
 
 export default function AddMemberScreen({ groupId }: { groupId: string }) {
-  const { colors, surfaces } = useTheme();
+  const { colors } = useTheme();
   const userId = useAppSelector((state) => state.auth.user?.id);
-  const { currentData, isLoading, isError, isFetching, error, refetch } =
-    useGetGroupMembersQuery(groupId, { refetchOnMountOrArgChange: true });
-  const isOwner = currentData?.data.members.some(
-    (member) =>
-      member.status === "ACTIVE" &&
-      member.role === "OWNER" &&
-      member.userId?._id === userId,
-  );
+  const members = useGetGroupMembersQuery(groupId, { refetchOnMountOrArgChange: true });
+  const isOwner = members.currentData?.data.members.some(member => member.status === "ACTIVE" && member.role === "OWNER" && member.userId?._id === userId) && !members.isError;
+  const invites = useGetGroupInvitationsQuery(groupId, { skip: !isOwner, refetchOnMountOrArgChange: true });
+  const [create, createState] = useCreateInvitationMutation();
+  const [revoke, revokeState] = useRevokeInvitationMutation();
   const [email, setEmail] = useState("");
+  const [fieldError, setFieldError] = useState("");
   const [message, setMessage] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  function fieldError(field: string, text: string) {
-    setFieldErrors({ [field]: text });
-    setMessage("Check the highlighted field and try again.");
-  }
+  const [created, setCreated] = useState<{ invitation: Invitation; code: string } | null>(null);
+  const lock = useRef(false);
+  const busy = createState.isLoading || revokeState.isLoading;
+  const { refetch: refreshMembers } = members;
+  useFocusEffect(useCallback(() => { void refreshMembers(); }, [refreshMembers]));
 
-  const [added, setAdded] = useState<
-    AddGroupMemberResponse["data"]["member"] | null
-  >(null);
-  const submitting = useRef(false);
-  const [addMember, { isLoading: saving }] = useAddGroupMemberMutation();
-  const unsaved = useUnsavedChanges(!added && !!email.trim(), saving);
-
-  function back() {
-    unsaved.requestLeave(() => router.navigate({
-      pathname: "/groups/[groupId]/group",
-      params: { groupId },
-    }));
-  }
   async function submit() {
-    if (submitting.current || !isOwner || isError || isFetching) return;
+    if (lock.current || !isOwner || members.isFetching) return;
     const normalized = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      fieldError("email", "Enter a valid email address.");
-      return;
-    }
-    Keyboard.dismiss();
-    submitting.current = true;
-    setMessage("");
+    setMessage(""); setFieldError("");
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) { setFieldError("Enter a valid email address."); return; }
+    Keyboard.dismiss(); lock.current = true;
     try {
-      const result = await addMember({ groupId, email: normalized }).unwrap();
-      setAdded(result.data.member);
-    } catch (error) {
-      setMessage(authError(error, "Unable to add this member. Try again."));
-    } finally {
-      submitting.current = false;
-    }
+      const response = await create({ groupId, email: normalized }).unwrap();
+      setCreated(response.data); setEmail("");
+    } catch (error) { setMessage(authError(error, "Could not create the invitation.")); }
+    finally { lock.current = false; }
+  }
+  async function revokeInvite(invitation: Invitation) {
+    if (lock.current) return;
+    lock.current = true; setMessage("");
+    try {
+      await revoke({ groupId, id: invitation.id, createdAt: invitation.createdAt }).unwrap();
+      if (created?.invitation.id === invitation.id) setCreated(null);
+    } catch (error) { setMessage(authError(error, "Could not revoke this invitation.")); }
+    finally { lock.current = false; }
+  }
+  async function shareCode() {
+    if (!created) return;
+    try {
+      await Share.share({ message: `You’re invited to ${created.invitation.group.name} on Divvy. Sign in or register with ${created.invitation.email}, open Invitations from Your groups, and enter this code to accept. Invitation code: ${created.code}. Expires ${new Date(created.invitation.expiresAt).toLocaleDateString()}.` });
+    } catch { setMessage("Sharing is unavailable. You can select and copy the code below."); }
   }
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={{ padding: 20, gap: 24, flexGrow: 1 }}
-        >
-          {!added ? (
-            <View className="flex-row items-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                accessibilityLabel="Back to group"
-                disabled={saving}
-                onPress={back}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={22}
-                  color={colors.foreground}
-                  accessible={false}
-                />
-              </Button>
-              <Text className="text-3xl font-semibold">Add member</Text>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets={Platform.OS === "ios"} contentContainerStyle={{ padding: 20, gap: 20 }}>
+        <View className="flex-row items-center gap-3">
+          <Button variant="outline" size="icon" accessibilityLabel="Back to group" disabled={busy} onPress={() => router.navigate({ pathname: "/groups/[groupId]/group", params: { groupId } })}><Ionicons name="chevron-back" size={22} color={colors.foreground} /></Button>
+          <Text accessibilityRole="header" className="flex-1 text-2xl font-semibold">Invite members</Text>
+        </View>
+        {members.isLoading ? <ActivityIndicator accessibilityLabel="Checking group ownership" /> : members.isError ? <QueryErrorState error={members.error} subject="Group membership" busy={members.isFetching} onRetry={() => void members.refetch()} /> : !isOwner ? <Text>Only the group owner can invite members.</Text> : (
+          <>
+            <View className="gap-4 rounded-3xl bg-card p-5">
+              <Text className="text-sm leading-6 text-muted-foreground">Invite someone by email. They can register or sign in with that email and enter the shared code in Invitations to accept. They won’t have group access until they accept. Invitations expire after seven days.</Text>
+              <FormField label="Recipient email" icon="mail-outline" autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" placeholder="friend@example.com" value={email} editable={!busy} error={fieldError} onChangeText={value => { setEmail(value); setFieldError(""); setMessage(""); }} onSubmitEditing={submit} returnKeyType="send" />
+              <Button disabled={busy || members.isFetching} onPress={submit}><Text>{createState.isLoading ? "Creating…" : "Create invitation"}</Text></Button>
+              <Text className="text-xs text-muted-foreground">Share the code yourself. No email notification is sent.</Text>
             </View>
-          ) : null}
-          {added ? (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                width: "100%",
-                maxWidth: 440,
-                alignSelf: "center",
-                paddingVertical: 32,
-                gap: 28,
-              }}
-            >
-              <View className="items-center gap-5">
-                <View
-                  style={{
-                    width: 104,
-                    height: 104,
-                    borderRadius: 52,
-                    backgroundColor: colors.secondary,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 72,
-                      height: 72,
-                      borderRadius: 36,
-                      backgroundColor: colors.primary,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons
-                      name="checkmark"
-                      size={38}
-                      color={colors.primaryForeground}
-                      accessible={false}
-                    />
-                  </View>
-                </View>
-                <View className="items-center gap-2">
-                  <Text
-                    accessibilityRole="header"
-                    accessibilityLiveRegion="polite"
-                    className="text-center text-3xl font-semibold"
-                  >
-                    Member added!
-                  </Text>
-                  <Text className="text-center text-base leading-6 text-muted-foreground">
-                    {added.firstName} is now part of your group. You’re ready to
-                    share expenses together.
-                  </Text>
-                </View>
-              </View>
-              <View
-                className="gap-4 rounded-[24px] bg-card p-5"
-                style={surfaces.card}
-              >
-                <View className="flex-row items-center gap-3">
-                  <UserAvatar
-                    firstName={added.firstName}
-                    lastName={added.lastName}
-                    size={52}
-                  />
-                  <View className="min-w-0 flex-1 gap-1">
-                    <Text className="text-lg font-semibold">
-                      {added.firstName} {added.lastName}
-                    </Text>
-                    <Text className="text-sm text-muted-foreground">
-                      {added.email}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-row items-center justify-between border-t border-border pt-4">
-                  <Text className="text-sm text-muted-foreground">
-                    Group access
-                  </Text>
-                  <View className="flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5">
-                    <Ionicons
-                      name="person-outline"
-                      size={13}
-                      color={colors.secondaryForeground}
-                      accessible={false}
-                    />
-                    <Text className="text-xs font-semibold text-secondary-foreground">
-                      Member
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View className="gap-3">
-                <Button className="min-h-14" onPress={back}>
-                  <Text>View group</Text>
-                  <Ionicons
-                    name="arrow-forward"
-                    size={18}
-                    color={colors.primaryForeground}
-                    accessible={false}
-                  />
-                </Button>
-                <Button
-                  variant="ghost"
-                  onPress={() => {
-                    setAdded(null);
-                    setEmail("");
-                    setMessage("");
-                  }}
-                >
-                  <Ionicons
-                    name="person-add-outline"
-                    size={18}
-                    color={colors.primary}
-                    accessible={false}
-                  />
-                  <Text className="text-primary">Add another member</Text>
-                </Button>
-              </View>
-            </View>
-          ) : isLoading ? (
-            <ActivityIndicator accessibilityLabel="Checking group access" />
-          ) : isError ? (
+            {created ? <View className="gap-4 rounded-3xl border border-primary bg-card p-5">
+              <Text accessibilityLiveRegion="polite" className="text-lg font-semibold">Invitation created</Text>
+              <Text>{created.invitation.email}</Text>
+              <Text selectable className="text-lg font-semibold" accessibilityLabel={`Invitation code ${created.code}`}>{created.code}</Text>
+              <Text className="text-sm text-muted-foreground">Save or share this code now; it’s only shown once. The recipient needs this code to accept from their invitation inbox.</Text>
+              <Text className="text-xs text-muted-foreground">Expires {new Date(created.invitation.expiresAt).toLocaleString()}</Text>
+              {Platform.OS !== "web" ? <Button variant="outline" disabled={busy} onPress={shareCode}><Text>Share invitation</Text></Button> : <Text className="text-sm text-muted-foreground">Select the code above to copy and share it.</Text>}
+            </View> : null}
+            <FormMessage message={message} />
             <View className="gap-3">
-              <Text accessibilityLiveRegion="polite">
-                {authError(error, "Unable to check group access.")}
-              </Text>
-              <Button disabled={isFetching} onPress={() => void refetch()}>
-                <Text>Retry</Text>
-              </Button>
+              <View className="flex-row items-center justify-between gap-2"><Text className="text-lg font-semibold">Recent invitations</Text><Button variant="ghost" disabled={invites.isFetching || busy} onPress={() => void invites.refetch()}><Text>Refresh</Text></Button></View>
+              {invites.isLoading ? <ActivityIndicator /> : invites.isError ? <QueryErrorState error={invites.error} subject="Invitations" busy={invites.isFetching} onRetry={() => void invites.refetch()} /> : !invites.currentData?.data.invitations.length ? <Text className="text-muted-foreground">No invitations yet.</Text> : invites.currentData.data.invitations.map(invitation => (
+                <View key={invitation.id} className="gap-3 rounded-2xl bg-card p-4">
+                  <Text className="font-semibold">{invitation.email}</Text>
+                  <Text className="text-sm text-muted-foreground">{invitation.status.charAt(0) + invitation.status.slice(1).toLowerCase()} · expires {new Date(invitation.expiresAt).toLocaleDateString()}</Text>
+                  {invitation.status === "PENDING" ? <Button variant="outline" disabled={busy} onPress={() => void revokeInvite(invitation)}><Text>Revoke invitation</Text></Button> : null}
+                </View>
+              ))}
             </View>
-          ) : !isOwner ? (
-            <Text>Only the group owner can add members.</Text>
-          ) : (
-            <>
-              <Text className="text-sm text-muted-foreground">
-                Add someone using the email address they registered with on
-                Divvy. They’ll be added directly to this group.
-              </Text>
-              <View className="gap-4 rounded-[24px] bg-card p-5">
-                <FormField
-                  label="Email address"
-                    returnKeyType="done"
-                    onSubmitEditing={() => void submit()}
-                  icon="mail-outline"
-                  placeholder="name@example.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={email}
-              error={fieldErrors.email}
-                  onChangeText={value => { setEmail(value); setFieldErrors({}); setMessage(""); }}
-                  editable={!saving}
-                />
-                <FormMessage message={message} />
-              </View>
-              <Button
-                disabled={saving || isFetching}
-                onPress={() => void submit()}
-              >
-                <Text>{saving ? "Adding…" : "Add member"}</Text>
-              </Button>
-            </>
-          )}
-          {!added ? (
-            <Button variant="ghost" disabled={saving} onPress={back}>
-              <Text>Cancel</Text>
-            </Button>
-          ) : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
-      {unsaved.dialog}
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }

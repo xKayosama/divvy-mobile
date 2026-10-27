@@ -1814,3 +1814,61 @@ test("password reset validation matches backend email, code, confirmation and UT
   assert.ok(passwordResetErrors(user.email, "123", "short", "different").password);
   assert.ok(passwordResetErrors(user.email, "123", "short", "different").confirmation);
 });
+
+test("invitation creation normalizes email and exposes a code without adding a member", async () => {
+  const { invitationsApi } = require("../src/features/groups/invitationsApi.ts");
+  signedIn();
+  global.fetch = async request => {
+    assert.equal(request.url, "https://divvy.test/api/groups/g1/invitations");
+    assert.equal(request.method, "POST");
+    assert.deepEqual(await request.json(), { email: "friend@example.com" });
+    return respond(201, { success: true, data: { invitation: { id: "i1", status: "PENDING" }, code: "a".repeat(32) } });
+  };
+  const result = await store.dispatch(invitationsApi.endpoints.createInvitation.initiate({ groupId: "g1", email: " FRIEND@example.com " })).unwrap();
+  assert.equal(result.data.invitation.status, "PENDING");
+  assert.equal(result.data.code, "a".repeat(32));
+});
+
+test("invitation inbox, lookup, accept, decline and revoke use separate authenticated contracts", async () => {
+  const { invitationsApi } = require("../src/features/groups/invitationsApi.ts");
+  signedIn(); const calls = [];
+  global.fetch = async request => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    calls.push({ path: new URL(request.url).pathname, method: request.method, body: request.method === "POST" ? await request.json() : null });
+    return respond(200, { success: true, data: { invitations: [], invitation: { id: "i1", status: "ACCEPTED" } } });
+  };
+  const incoming = store.dispatch(invitationsApi.endpoints.getInvitations.initiate()); await incoming.unwrap(); incoming.unsubscribe();
+  const outgoing = store.dispatch(invitationsApi.endpoints.getGroupInvitations.initiate("g1")); await outgoing.unwrap(); outgoing.unsubscribe();
+  const createdAt = "2026-10-27T00:00:00.000Z";
+  await store.dispatch(invitationsApi.endpoints.lookupInvitation.initiate(` ${"A".repeat(32)} `)).unwrap();
+  await store.dispatch(invitationsApi.endpoints.acceptInvitation.initiate({ id: "i1", createdAt, code: "A".repeat(32) })).unwrap();
+  await store.dispatch(invitationsApi.endpoints.declineInvitation.initiate({ id: "i2", createdAt })).unwrap();
+  await store.dispatch(invitationsApi.endpoints.revokeInvitation.initiate({ id: "i3", groupId: "g1", createdAt })).unwrap();
+  assert.deepEqual(calls, [
+    { path: "/api/invitations", method: "GET", body: null },
+    { path: "/api/groups/g1/invitations", method: "GET", body: null },
+    { path: "/api/invitations/lookup", method: "POST", body: { code: "a".repeat(32) } },
+    { path: "/api/invitations/i1/accept", method: "POST", body: { createdAt, code: "a".repeat(32) } },
+    { path: "/api/invitations/i2/decline", method: "POST", body: { createdAt } },
+    { path: "/api/groups/g1/invitations/i3/revoke", method: "POST", body: { createdAt } },
+  ]);
+});
+
+test("invitation acceptance refreshes group/member caches; failed acceptance preserves existing membership", async () => {
+  const { invitationsApi } = require("../src/features/groups/invitationsApi.ts");
+  const { groupsApi } = require("../src/features/groups/groupsApi.ts");
+  signedIn(); let groupFetches = 0; let fail = false;
+  global.fetch = async request => {
+    if (request.method === "GET") { groupFetches++; return respond(200, { success: true, data: { groups: [] } }); }
+    return fail ? respond(409, { success: false, message: "Invitation changed" }) : respond(200, { success: true, data: { invitation: { id: "i1", status: "ACCEPTED" } } });
+  };
+  const groups = store.dispatch(groupsApi.endpoints.getMyGroups.initiate()); await groups.unwrap();
+  await store.dispatch(invitationsApi.endpoints.acceptInvitation.initiate({ id: "i1", createdAt: "2026-10-27T00:00:00.000Z", code: "a".repeat(32) })).unwrap();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(groupFetches, 2);
+  fail = true;
+  await assert.rejects(store.dispatch(invitationsApi.endpoints.acceptInvitation.initiate({ id: "i1", createdAt: "2026-10-27T00:00:00.000Z", code: "a".repeat(32) })).unwrap());
+  assert.equal(groupFetches, 2);
+  assert.equal(store.getState().auth.user.id, user.id);
+  groups.unsubscribe();
+});

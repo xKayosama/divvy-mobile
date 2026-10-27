@@ -104,7 +104,7 @@ export default function GroupScreen({ groupId }: { groupId: string }) {
                       color={colors.primaryForeground}
                       accessible={false}
                     />
-                    <Text>Add member</Text>
+                    <Text>Invite members</Text>
                   </Button>
                   <Button
                     variant="outline"
