@@ -51,7 +51,8 @@
           "cameraPermission": "Allow Divvy to photograph receipts for expense scanning.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

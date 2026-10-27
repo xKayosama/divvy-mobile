@@ -1776,3 +1776,41 @@ test("activity detail formatting preserves native precision, old values, item as
  assert.match(activityValue([{userId:'a',amount:10,shares:2}],'participants','PHP',{a:'Sam'}),/Sam: PHP 10.00 \(2 shares\)/);
  assert.match(activityValue([{description:'Meal',quantity:1,amount:10,memberIds:['missing']}],'items','PHP'),/Unavailable member/);
 });
+
+test("password reset requests use public backend contracts without signing in", async () => {
+  const calls = [];
+  global.fetch = async (request) => {
+    calls.push({ url: request.url, method: request.method, body: await request.json() });
+    assert.equal(request.headers.get("Authorization"), null);
+    return respond(200, { success: true, message: "Check your email." });
+  };
+  await store.dispatch(authApi.endpoints.requestPasswordReset.initiate({ email: user.email })).unwrap();
+  await store.dispatch(authApi.endpoints.resetPassword.initiate({ email: user.email, code: "01234567", password: "new-password-123" })).unwrap();
+  assert.deepEqual(calls, [
+    { url: "https://divvy.test/api/auth/forgot-password", method: "POST", body: { email: user.email } },
+    { url: "https://divvy.test/api/auth/reset-password", method: "POST", body: { email: user.email, code: "01234567", password: "new-password-123" } },
+  ]);
+  assert.equal(store.getState().auth.user, null);
+  assert.equal(savedToken, null);
+});
+
+test("reset errors remain retryable and do not create a session", async () => {
+  for (const status of [400, 429, 503]) {
+    global.fetch = async () => respond(status, { success: false, message: "Try again." });
+    await assert.rejects(store.dispatch(authApi.endpoints.resetPassword.initiate({ email: user.email, code: "01234567", password: "new-password-123" })).unwrap(), (error) => error.status === status);
+    assert.equal(store.getState().auth.user, null);
+  }
+});
+
+test("password reset validation matches backend email, code, confirmation and UTF-8 limits", () => {
+  const { passwordResetErrors, resetEmailError } = require("../src/features/auth/passwordResetForm.ts");
+  assert.equal(resetEmailError(" test@example.com "), undefined);
+  assert.ok(resetEmailError("invalid"));
+  assert.ok(resetEmailError(`${"a".repeat(250)}@example.com`));
+  assert.deepEqual(passwordResetErrors(user.email, "01234567", "password123", "password123"), {});
+  assert.deepEqual(passwordResetErrors(user.email, "01234567", "😀".repeat(18), "😀".repeat(18)), {});
+  assert.ok(passwordResetErrors(user.email, "01234567", "😀".repeat(19), "😀".repeat(19)).password);
+  assert.ok(passwordResetErrors(user.email, "123", "short", "different").code);
+  assert.ok(passwordResetErrors(user.email, "123", "short", "different").password);
+  assert.ok(passwordResetErrors(user.email, "123", "short", "different").confirmation);
+});

@@ -99,6 +99,11 @@ export default function LoginScreen() {
           returnKeyType="go"
           onSubmitEditing={handleLogin}
         />
+        <Link href="/forgot-password" asChild>
+          <Button variant="ghost" disabled={busy} className="self-end">
+            <Text className="text-sm font-semibold text-primary">Forgot password?</Text>
+          </Button>
+        </Link>
         <FormMessage message={message} />
         <Button
           className="mt-1 h-14 rounded-2xl sm:h-14"

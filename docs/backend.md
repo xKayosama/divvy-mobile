@@ -29,6 +29,18 @@ Source: `src/modules/auth/auth.routes.js`, `auth.controller.js`, `auth.middlewar
 - JWT expiration is configured by `JWT_EXPIRES_IN` (documented default: `7d`). No refresh endpoint is registered in the current auth router.
 - Errors generally return `{ success: false, message }`.
 
+## Password reset (implemented 2026-10-27)
+
+Verified against `src/modules/auth/password-reset.controller.js`, `password-reset.email.js`, `auth.routes.js`, `auth.middleware.js`, and `src/modules/users/User.js` in the local backend.
+
+- Public `POST /api/auth/forgot-password`: `{ email }`; trims/lowercases email, rejects malformed/oversized input with 400. Returns 200 `{ success: true, message }` with the same generic message for existing/unknown accounts and cooldown requests. No code or token is returned. Missing backend email configuration returns 503 globally. Known provider failures remove that issued code and retain the generic response; check backend logs for delivery failures.
+- Public `POST /api/auth/reset-password`: `{ email, code, password }`; code is exactly eight digits including leading zeros. Password requires at least 8 characters and at most 72 UTF-8 bytes. Success 200 `{ success: true, message }`; invalid/expired/used codes return 400; service failures return 503. No automatic sign-in.
+- Backend email delivery uses Resend HTTPS API. Set **backend-only** `RESEND_API_KEY` and `PASSWORD_RESET_FROM` with a verified sender/domain. Never put these in Expo public variables. No dependencies were added. Actual inbox delivery requires these settings and a reachable provider.
+- Codes expire in 15 minutes, are stored as keyed HMACs in a query-hidden user field, and allow at most five attempts. Resend replaces the previous code, with a database-enforced 60-second account cooldown. Per-IP limits: five requests and twenty submissions per 15 minutes. Shared IP limiting is required when scaling, as with existing auth limits.
+- A successful reset atomically writes the bcrypt password, consumes the code and increments `authVersion`. JWT creation carries that version; protected requests reject older versions. Missing versions count as zero for existing accounts/tokens. No data migration is needed. Existing sessions are rejected on their next request.
+- Mobile: Login → Forgot password → email request → code/new password/confirmation → success → Sign in. Includes resend countdown, different-email action, inline validation, duplicate-submit guards, network/server feedback and no password/code in route parameters or persistence. Reloading the screen starts a fresh request flow.
+- Regression tests cover both API contracts, form limits, generic responses, cooldown, delivery failure, expired/used codes, exhausted attempts, concurrent consumption and old-session invalidation. Tests mock MongoDB/email; live device and provider smoke tests remain necessary before release.
+
 ## Feature API map
 
 ### Dashboard spending periods (added 2026-10-16)
