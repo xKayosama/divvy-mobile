@@ -197,3 +197,20 @@ Expo Go includes only its bundled native modules. Native dependencies outside th
 | Upgrade dependency mismatch | Read matching SDK docs, run Expo Doctor, and review expo install --fix changes. |
 
 Keep this guide aligned with scripts, routes, authentication behavior, and release setup as the app grows.
+
+
+## Bill notification setup and testing
+
+1. Install current dependencies and create a **new development build**; the existing binary does not include the new notifications native module/configuration. Use `npx eas-cli@latest build --profile development --platform ios` or `--platform android` (the project uses npm).
+2. Configure platform push credentials using `npx eas-cli@latest credentials --platform ios` and `npx eas-cli@latest credentials --platform android`: iOS needs an APNs push key; Android needs FCM v1 credentials plus the Firebase `google-services.json`. Set `GOOGLE_SERVICES_JSON` to its local path (for example in `.env.local`) and configure the same name as an EAS development **file** environment variable for cloud builds. `app.config.js` maps this to `expo.android.googleServicesFile` and rejects Android cloud builds when missing. Obtain the Firebase file for the exact Android package already in app.json. Keep service-account keys and Expo access tokens out of the mobile bundle/repository. Follow https://docs.expo.dev/push-notifications/push-notifications-setup/ for platform-specific steps. No Firebase configuration is fabricated by this change.
+3. On the backend, set `BILL_NOTIFICATIONS_ENABLED=true` after credential setup. If enhanced Expo push security is enabled, also set backend-only `EXPO_ACCESS_TOKEN`. Restart the backend and keep it running.
+4. Sign in on the native development build, open **Profile → Bill notifications**, tap **Enable bill notifications**, and allow OS permission. Settings should show this device connected and the worker enabled.
+5. Tap **Send test notification**, background the app and confirm arrival. Expo acceptance alone is not delivery confirmation. Check the daily worker's receipt status if delivery fails; verify FCM/APNs keys and rebuild after native configuration changes.
+6. For a daily reminder, create an unpaid bill due today/tomorrow or overdue in an active group. At/after 9AM device time the worker sends one digest; if today's digest was already sent it waits until tomorrow. Bill day labels follow UTC, matching existing dashboard reminders. Tap it and confirm the correct bill/group opens. Repeat with the app fully closed.
+7. Confirm paid/deleted bills disappear from subsequent reminders, leaving/removal/deleting a group removes access, turning off prevents future reminders, and signing out or resetting the password stops the old session's deliveries. A previously queued push may already be in flight. Test a second account to ensure it starts opted out and cannot open the first account's notification.
+
+Web/Expo Go display an unsupported message instead of requesting push permission. Native delivery cannot be validated in the web preview. Notification bodies omit bill descriptions/amounts to reduce lock-screen disclosure. There is no email provider dependency.
+
+### Test the notification inbox
+
+Reload the app after updating the backend. On Your groups, tap the bell beside the title. A pending invitation or an unpaid bill due tomorrow/today/earlier generates an inbox entry even with push disabled. Return to Your groups to see the unread badge. Tap an entry to mark it read and open its destination, or use Mark all read. Read status persists after reopening/signing in on another device. The first bill digest of each UTC date is retained as history; paying a bill does not delete an old reminder. Refresh discovers new invitations; a later UTC date can generate another digest. No old daily reminders are backfilled. Existing push setup is unchanged; no new native build is needed.

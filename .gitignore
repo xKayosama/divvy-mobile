@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Push configuration (use an EAS file environment variable for cloud builds)
+/google-services.json
+/fcm-service-account*.json

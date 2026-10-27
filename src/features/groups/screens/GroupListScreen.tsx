@@ -4,9 +4,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
 import { useGetInvitationsQuery } from "../invitationsApi";
-import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { InboxBell } from "@/features/notifications/InboxBell";
 import { Brand } from "@/components/brand/Brand";
 import ScreenBackground from "@/components/layout/ScreenBackground";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,14 @@ import { useGetMyGroupsQuery } from "../groupsApi";
 export default function GroupListScreen() {
   const { colors, surfaces } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Reserve the list padding, three 48px buttons, their spacing, and the logo gap.
+  const logoWidth = Math.min(152, Math.max(0, width - insets.left - insets.right - 40 - 160 - 12));
   const { data, isLoading, isFetching, isError, error, refetch } = useGetMyGroupsQuery();
 
   const incoming = useGetInvitationsQuery(undefined, { refetchOnMountOrArgChange: true, pollingInterval: 30000 });
   const { refetch: refreshInvitations } = incoming;
+  const invitationCount = incoming.currentData?.data.invitations.length ?? 0;
   useFocusEffect(useCallback(() => { void refetch(); void refreshInvitations(); }, [refetch, refreshInvitations]));
 
   return (
@@ -35,23 +40,39 @@ export default function GroupListScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 20) + 20, flexGrow: 1 }}
         ListHeaderComponent={
           <View className="mb-6 gap-6">
-            <View className="flex-row items-center justify-between">
-              <Brand />
-              <Button variant="outline" size="icon" accessibilityLabel="Open profile" onPress={() => router.push("/profile")}>
-                <Ionicons name="person-outline" size={22} color={colors.foreground} accessible={false} />
-              </Button>
+            <View className="flex-row items-center justify-between gap-3">
+              <Brand width={logoWidth} />
+              <View className="ml-auto flex-row items-center gap-2" style={{ flexShrink: 0 }}>
+                <View>
+                  <Button variant="outline" size="icon" accessibilityLabel={`Invitations${invitationCount ? `, ${invitationCount} pending` : ""}`} onPress={() => router.push("/invitations")}>
+                    <Ionicons name="mail-outline" size={22} color={colors.primary} accessible={false} />
+                  </Button>
+                  {invitationCount > 0 ? (
+                    <View pointerEvents="none" accessible={false} className="absolute -right-1 -top-1 min-w-5 items-center justify-center rounded-full bg-primary px-1 py-0.5">
+                      <Text className="text-[10px] font-semibold text-primary-foreground">{invitationCount > 99 ? "99+" : invitationCount}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Button variant="outline" size="icon" accessibilityLabel="Deleted groups" onPress={() => router.push("/groups/deleted")}>
+                  <Ionicons name="archive-outline" size={22} color={colors.primary} accessible={false} />
+                </Button>
+                <Button variant="outline" size="icon" accessibilityLabel="Open profile" onPress={() => router.push("/profile")}>
+                  <Ionicons name="person-outline" size={22} color={colors.foreground} accessible={false} />
+                </Button>
+              </View>
             </View>
             <View className="gap-2">
               <Text className="text-xs font-semibold text-secondary-foreground" style={{ letterSpacing: 2 }}>SHARED SPACES</Text>
-              <Text className="text-3xl font-semibold tracking-tight">Your groups</Text>
+              <View className="flex-row items-center justify-between gap-3">
+                <Text className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">Your groups</Text>
+                <InboxBell />
+              </View>
               <Text className="text-sm text-muted-foreground">Choose a group to manage your shared spending.</Text>
             </View>
             <Button className="h-14 rounded-2xl" onPress={() => router.push("/groups/create")}>
               <Ionicons name="add" size={22} color={colors.primaryForeground} accessible={false} />
               <Text className="font-semibold">Create group</Text>
             </Button>
-            <Button variant="outline" onPress={() => router.push("/invitations")}><Ionicons name="mail-outline" size={20} color={colors.primary} accessible={false}/><Text>Invitations{incoming.currentData?.data.invitations.length ? ` (${incoming.currentData.data.invitations.length})` : ""}</Text></Button>
-            <Button variant="outline" onPress={()=>router.push("/groups/deleted")}><Ionicons name="archive-outline" size={20} color={colors.primary} accessible={false}/><Text>Deleted groups</Text></Button>
             {isError ? (
               <QueryErrorState error={error} subject="Groups" busy={isFetching} onRetry={() => void refetch()} />
             ) : data ? <Text className="text-xs text-muted-foreground">{data.data.groups.length} {data.data.groups.length === 1 ? "group" : "groups"}</Text> : null}

@@ -35,3 +35,5 @@ npm run test:auth
 ```
 
 Group owners can invite an email from **Group → Invite members** and share the generated code. Recipients register/sign in with that email, open **Your groups → Invitations**, review the code, and accept or decline. No invitation email is sent.
+
+Bill push notifications are available through **Profile → Bill notifications** in a new native development build. Configure FCM/APNs credentials and enable the backend worker before testing delivery; see the developer guide.

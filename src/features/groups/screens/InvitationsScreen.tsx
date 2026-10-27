@@ -1,4 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Keyboard, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,9 +9,11 @@ import { Text } from "@/components/ui/text";
 import { QueryErrorState } from "@/components/ui/content-state";
 import { authError } from "@/features/auth/errors";
 import { useAppSelector } from "@/hooks/redux";
+import { useTheme } from "@/theme/ThemeProvider";
 import { useAcceptInvitationMutation, useDeclineInvitationMutation, useGetInvitationsQuery, useLookupInvitationMutation, type Invitation } from "../invitationsApi";
 
 export default function InvitationsScreen() {
+  const { colors } = useTheme();
   const email = useAppSelector(state => state.auth.user?.email);
   const { currentData, isLoading, isFetching, isError, error, refetch } = useGetInvitationsQuery(undefined, { refetchOnMountOrArgChange: true, pollingInterval: 30000 });
   const [lookup, lookupState] = useLookupInvitationMutation();
@@ -51,8 +54,13 @@ export default function InvitationsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets={Platform.OS === "ios"} contentContainerStyle={{ padding: 20, gap: 20 }}>
-        <Button variant="outline" disabled={busy} onPress={() => router.navigate("/groups")}><Text>Back to groups</Text></Button>
-        <View className="gap-2"><Text accessibilityRole="header" className="text-3xl font-semibold">Invitations</Text><Text className="text-sm leading-6 text-muted-foreground">Invitations for {email}. Only accept groups you recognize. To use another invited email, sign out and sign in with that account.</Text></View>
+        <View className="flex-row items-center gap-3">
+          <Button variant="outline" size="icon" accessibilityLabel="Back to groups" disabled={busy} onPress={() => router.navigate("/groups")}>
+            <Ionicons name="chevron-back" size={22} color={colors.foreground} accessible={false} />
+          </Button>
+          <Text accessibilityRole="header" className="flex-1 text-2xl font-semibold">Invitations</Text>
+        </View>
+        <Text className="text-sm leading-6 text-muted-foreground">Invitations for {email}. Only accept groups you recognize. To use another invited email, sign out and sign in with that account.</Text>
         <View className="gap-4 rounded-3xl bg-card p-5">
           <FormField label="Invitation code" icon="key-outline" placeholder="Paste a code from the group owner" autoCapitalize="none" autoCorrect={false} value={code} maxLength={64} editable={!busy} onChangeText={value => { setCode(value); setPreview(null); setMessage(""); }} onSubmitEditing={find} returnKeyType="go" />
           <Button variant="outline" disabled={busy} onPress={find}><Text>{lookupState.isLoading ? "Checking…" : "Review invitation"}</Text></Button>

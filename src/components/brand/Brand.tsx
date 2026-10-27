@@ -13,12 +13,13 @@ export function BrandMark({ size = 44 }: { size?: number }) {
   );
 }
 
-export function Brand() {
+export function Brand({ width = 152 }: { width?: number }) {
+  const scale = width / 152;
   return (
     <View
       accessible
       accessibilityLabel="Divvy"
-      style={{ width: 152, height: 52 }}
+      style={{ width, height: 52 * scale, flexShrink: 0 }}
     >
       {/* The supplied wordmark includes transparent padding around the artwork. */}
       <Image
@@ -26,11 +27,11 @@ export function Brand() {
         contentFit="contain"
         accessible={false}
         style={{
-          width: 210,
-          height: 70,
+          width: 210 * scale,
+          height: 70 * scale,
           position: "absolute",
-          left: -30,
-          top: -6,
+          left: -30 * scale,
+          top: -6 * scale,
         }}
       />
     </View>

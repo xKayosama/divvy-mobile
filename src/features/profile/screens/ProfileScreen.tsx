@@ -1,3 +1,4 @@
+import { BillNotificationSettings } from "@/features/notifications/BillNotificationSettings";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
@@ -135,6 +136,8 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
             <Text className="text-xs text-muted-foreground">System follows your device appearance.</Text>
             <FormMessage message={saveError ?? ""} />
           </View>
+
+          <BillNotificationSettings />
 
           <FormMessage message={message} />
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { ActivityIndicator, FlatList, View } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -6,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { FormMessage } from "@/components/auth/FormField";
 import { authError } from "@/features/auth/errors";
+import { useTheme } from "@/theme/ThemeProvider";
 import {
   useGetDeletedGroupsQuery,
   useRestoreGroupMutation,
 } from "../groupsApi";
 export default function DeletedGroupsScreen() {
+  const { colors } = useTheme();
   const { currentData, isFetching, isError, error, refetch } =
     useGetDeletedGroupsQuery(undefined, { refetchOnMountOrArgChange: true });
   const [restore, { isLoading }] = useRestoreGroupMutation();
@@ -25,15 +28,19 @@ export default function DeletedGroupsScreen() {
         contentContainerStyle={{ padding: 20, gap: 16, flexGrow: 1 }}
         ListHeaderComponent={
           <View className="gap-4">
-            <Button
-              variant="outline"
-              onPress={() => router.navigate("/groups")}
-            >
-              <Text>Back to groups</Text>
-            </Button>
-            <Text accessibilityRole="header" className="text-2xl font-semibold">
-              Deleted groups
-            </Text>
+            <View className="flex-row items-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                accessibilityLabel="Back to groups"
+                onPress={() => router.navigate("/groups")}
+              >
+                <Ionicons name="chevron-back" size={22} color={colors.foreground} accessible={false} />
+              </Button>
+              <Text accessibilityRole="header" className="flex-1 text-2xl font-semibold">
+                Deleted groups
+              </Text>
+            </View>
             <Text className="text-sm text-muted-foreground">
               Only groups you own appear here. All records are preserved.
               Restored recurring expenses stay paused; recurring bills skip

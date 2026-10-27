@@ -19,6 +19,7 @@ import {
 } from "@/features/auth/SessionProvider";
 import { useAppSelector } from "@/hooks/redux";
 import { store } from "@/store";
+import { BillNotificationProvider } from "@/features/notifications/BillNotificationProvider";
 
 function Navigator() {
   const { loading, restoreError, retry } = useSession();
@@ -88,11 +89,13 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
         <SessionProvider>
+        <BillNotificationProvider>
           <View style={{ flex: 1 }}>
             <Navigator />
             <ThemedStatusBar />
             <PortalHost />
           </View>
+        </BillNotificationProvider>
         </SessionProvider>
         </ThemeProvider>
       </SafeAreaProvider>

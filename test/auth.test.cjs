@@ -1872,3 +1872,73 @@ test("invitation acceptance refreshes group/member caches; failed acceptance pre
   assert.equal(store.getState().auth.user.id, user.id);
   groups.unsubscribe();
 });
+
+test("push device registration, status, disabling and testing use authenticated POST bodies", async () => {
+  const { notificationsApi } = require("../src/features/notifications/notificationsApi.ts");
+  signedIn(); const calls = [];
+  const token = "ExpoPushToken[abcdefghijklmnop]";
+  global.fetch = async request => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    calls.push({ path: new URL(request.url).pathname, method: request.method, body: await request.json() });
+    return respond(200, { success: true, data: { device: { enabled: true } } });
+  };
+  await store.dispatch(notificationsApi.endpoints.registerPushDevice.initiate({ token, timeZone: "Asia/Manila" })).unwrap();
+  await store.dispatch(notificationsApi.endpoints.getPushDeviceStatus.initiate({ token })).unwrap();
+  await store.dispatch(notificationsApi.endpoints.testPushDevice.initiate({ token })).unwrap();
+  await store.dispatch(notificationsApi.endpoints.disablePushDevice.initiate({ token })).unwrap();
+  assert.deepEqual(calls, [
+    { path: "/api/notifications/devices", method: "POST", body: { token, timeZone: "Asia/Manila" } },
+    { path: "/api/notifications/status", method: "POST", body: { token } },
+    { path: "/api/notifications/test", method: "POST", body: { token } },
+    { path: "/api/notifications/devices", method: "DELETE", body: { token } },
+  ]);
+});
+
+test("notification taps are account-bound and map only validated IDs to app bill routes", () => {
+  const { notificationRoute } = require("../src/features/notifications/notificationRoute.ts");
+  const groupId = "a".repeat(24), billId = "b".repeat(24);
+  assert.equal(notificationRoute(undefined, "u1"), null);
+  assert.equal(notificationRoute({ type: "bill-reminder", userId: "other", groupId }, "u1"), null);
+  assert.equal(notificationRoute({ type: "unknown", userId: "u1" }, "u1"), null);
+  assert.deepEqual(notificationRoute({ type: "bill-reminder", userId: "u1", groupId, billId }, "u1"), { pathname: "/groups/[groupId]/bills/[billId]", params: { groupId, billId } });
+  assert.deepEqual(notificationRoute({ type: "bill-reminder", userId: "u1", groupId }, "u1"), { pathname: "/groups/[groupId]/bills", params: { groupId } });
+  assert.equal(notificationRoute({ type: "bill-reminder", userId: "u1", groupId: "../../profile", url: "https://bad.example" }, "u1"), "/groups");
+});
+
+test("inbox read actions refresh both history and the bell count", async () => {
+  const { notificationsApi } = require("../src/features/notifications/notificationsApi.ts");
+  signedIn(); let count = 2; let countFetches = 0; let listFetches = 0;
+  global.fetch = async request => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    const url = new URL(request.url);
+    if (url.pathname.endsWith("unread-count")) { countFetches++; return respond(200, { success: true, data: { unreadCount: count } }); }
+    if (url.pathname.endsWith("inbox")) { listFetches++; assert.equal(url.searchParams.get("page"), "1"); return respond(200, { success: true, data: { notifications: [], unreadCount: count, pagination: { page: 1, total: 2, totalPages: 1 } } }); }
+    assert.equal(request.method, "POST");
+    if (url.pathname.endsWith("read-all")) count = 0;
+    else { assert.equal(url.pathname, "/api/notifications/inbox/n1/read"); count = 1; }
+    return respond(200, { success: true });
+  };
+  const bell = store.dispatch(notificationsApi.endpoints.getUnreadCount.initiate());
+  const history = store.dispatch(notificationsApi.endpoints.getInbox.initiate(1));
+  await Promise.all([bell.unwrap(), history.unwrap()]);
+  await store.dispatch(notificationsApi.endpoints.readNotification.initiate("n1")).unwrap();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(notificationsApi.endpoints.getUnreadCount.select()(store.getState()).data.data.unreadCount, 1);
+  await store.dispatch(notificationsApi.endpoints.readAllNotifications.initiate()).unwrap();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(notificationsApi.endpoints.getUnreadCount.select()(store.getState()).data.data.unreadCount, 0);
+  assert.equal(countFetches, 3); assert.equal(listFetches, 3);
+  bell.unsubscribe(); history.unsubscribe();
+});
+
+test("a failed inbox read remains unread and does not clear the session", async () => {
+  const { notificationsApi } = require("../src/features/notifications/notificationsApi.ts");
+  signedIn();
+  global.fetch = async request => request.method === "GET" ? respond(200, { success: true, data: { unreadCount: 1 } }) : respond(503, { success: false, message: "Try again" });
+  const bell = store.dispatch(notificationsApi.endpoints.getUnreadCount.initiate()); await bell.unwrap();
+  await assert.rejects(store.dispatch(notificationsApi.endpoints.readNotification.initiate("n1")).unwrap());
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(notificationsApi.endpoints.getUnreadCount.select()(store.getState()).data.data.unreadCount, 1);
+  assert.equal(store.getState().auth.user.id, user.id);
+  bell.unsubscribe();
+});

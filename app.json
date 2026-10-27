@@ -52,7 +52,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "bill-reminders",
+          "color": "#188468"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
