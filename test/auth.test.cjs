@@ -1942,3 +1942,72 @@ test("a failed inbox read remains unread and does not clear the session", async 
   assert.equal(store.getState().auth.user.id, user.id);
   bell.unsubscribe();
 });
+
+test("profile edits update the signed-in name and refresh shared member caches", async () => {
+  signedIn(); let requests = 0;
+  const { groupsApi } = require("../src/features/groups/groupsApi.ts");
+  global.fetch = async request => {
+    if (request.method === "GET") { requests++; return respond(200, { success: true, data: { groups: [] } }); }
+    assert.equal(request.url, "https://divvy.test/api/auth/me"); assert.equal(request.method, "PATCH");
+    assert.deepEqual(await request.json(), { firstName: "Updated", lastName: "Person" });
+    return respond(200, { success: true, data: { user: { ...user, firstName: "Updated", lastName: "Person" } } });
+  };
+  const groups = store.dispatch(groupsApi.endpoints.getMyGroups.initiate()); await groups.unwrap();
+  await store.dispatch(authApi.endpoints.updateProfile.initiate({ firstName: "Updated", lastName: "Person" })).unwrap();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(store.getState().auth.user.firstName, "Updated"); assert.equal(store.getState().auth.token, "saved-token");
+  assert.equal(requests, 2); groups.unsubscribe();
+});
+
+test("failed and late profile responses cannot overwrite another session", async () => {
+  signedIn();
+  global.fetch = async () => respond(503, { success: false, message: "Try again" });
+  await assert.rejects(store.dispatch(authApi.endpoints.updateProfile.initiate({ firstName: "Changed", lastName: "Name" })).unwrap());
+  assert.equal(store.getState().auth.user.firstName, user.firstName);
+  let finish; let started;
+  const ready = new Promise(resolve => { started = resolve; });
+  global.fetch = async () => { started(); return new Promise(resolve => { finish = resolve; }); };
+  const pending = store.dispatch(authApi.endpoints.updateProfile.initiate({ firstName: "Old response", lastName: "Name" }));
+  await ready; store.dispatch(setSession({ token: "new-session", user: { ...user, firstName: "Current" } }));
+  finish(respond(200, { success: true, data: { user: { ...user, firstName: "Old response" } } }));
+  await pending.unwrap(); assert.equal(store.getState().auth.user.firstName, "Current");
+});
+
+test("email changes require request and verification before returning a replacement session", async () => {
+  signedIn(); const calls = [];
+  global.fetch = async request => {
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    calls.push([new URL(request.url).pathname, await request.json()]);
+    return respond(200, { success: true, data: { token: "replacement", user: { ...user, email: "new@example.com" } } });
+  };
+  await store.dispatch(authApi.endpoints.requestEmailChange.initiate({ email: "new@example.com", password: "current-password" })).unwrap();
+  assert.equal(store.getState().auth.user.email, user.email);
+  const verified = await store.dispatch(authApi.endpoints.confirmEmailChange.initiate({ email: "new@example.com", code: "01234567" })).unwrap();
+  assert.equal(verified.data.token, "replacement");
+  assert.deepEqual(calls, [
+    ["/api/auth/email-change", { email: "new@example.com", password: "current-password" }],
+    ["/api/auth/email-change/confirm", { email: "new@example.com", code: "01234567" }],
+  ]);
+});
+
+test("account deletion sends the reviewed plan and password only in its authenticated body", async () => {
+  signedIn(); const calls = [];
+  global.fetch = async request => {
+    calls.push([request.method, new URL(request.url).pathname, request.method === "DELETE" ? await request.json() : null]);
+    assert.equal(request.headers.get("Authorization"), "Bearer saved-token");
+    return respond(200, { success: true, data: { planHash: "a".repeat(64), groups: [] } });
+  };
+  const preview = store.dispatch(authApi.endpoints.getDeletionPreview.initiate()); const result = await preview.unwrap(); preview.unsubscribe();
+  await store.dispatch(authApi.endpoints.deleteAccount.initiate({ password: "current-password", confirmation: "DELETE", planHash: result.data.planHash })).unwrap();
+  assert.deepEqual(calls, [
+    ["GET", "/api/auth/deletion-preview", null],
+    ["DELETE", "/api/auth/me", { password: "current-password", confirmation: "DELETE", planHash: "a".repeat(64) }],
+  ]);
+});
+
+test("profile forms validate names, email and explicit deletion confirmation", () => {
+  const { validateNames, validateEmailChange, validateDeletion } = require("../src/features/profile/profileValidation.ts");
+  assert.equal(validateNames("Test", "Person"), ""); assert.ok(validateNames(" ", "Person")); assert.ok(validateNames("a".repeat(101), "Person"));
+  assert.equal(validateEmailChange("new@example.com", "password"), ""); assert.ok(validateEmailChange("bad", "password")); assert.ok(validateEmailChange("new@example.com", ""));
+  assert.equal(validateDeletion("password", "DELETE"), ""); assert.ok(validateDeletion("password", "delete")); assert.ok(validateDeletion("", "DELETE"));
+});

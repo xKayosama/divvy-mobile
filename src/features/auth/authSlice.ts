@@ -8,7 +8,10 @@ const slice = createSlice({
   reducers: {
     setSession: (_, action: PayloadAction<AuthState>) => action.payload,
     clearSession: () => initialState,
+    updateUser: (state, action: PayloadAction<NonNullable<AuthState["user"]>>) => {
+      if (state.user?.id === action.payload.id) state.user = action.payload;
+    },
   },
 });
-export const { setSession, clearSession } = slice.actions;
+export const { setSession, clearSession, updateUser } = slice.actions;
 export default slice.reducer;

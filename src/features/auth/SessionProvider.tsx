@@ -71,10 +71,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     dispatch(setSession(response.data));
   }
   async function clear() {
-    await writeToken(null);
-    dispatch(clearSession());
-    dispatch(api.util.resetApiState());
-    setRestoreError("");
+    try { await writeToken(null); }
+    finally {
+      dispatch(clearSession());
+      dispatch(api.util.resetApiState());
+      setRestoreError("");
+    }
   }
   return (
     <Context.Provider

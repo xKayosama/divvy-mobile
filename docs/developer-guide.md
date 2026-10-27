@@ -214,3 +214,9 @@ Web/Expo Go display an unsupported message instead of requesting push permission
 ### Test the notification inbox
 
 Reload the app after updating the backend. On Your groups, tap the bell beside the title. A pending invitation or an unpaid bill due tomorrow/today/earlier generates an inbox entry even with push disabled. Return to Your groups to see the unread badge. Tap an entry to mark it read and open its destination, or use Mark all read. Read status persists after reopening/signing in on another device. The first bill digest of each UTC date is retained as history; paying a bill does not delete an old reminder. Refresh discovers new invitations; a later UTC date can generate another digest. No old daily reminders are backfilled. Existing push setup is unchanged; no new native build is needed.
+
+### Test profile editing and deletion
+
+Reload after restarting the backend. Profile → Edit profile lets you save first/last names and immediately updates the header/avatar initials. Email changes require the current password and the 8-digit code delivered to the new address; confirmation replaces this session and signs out other devices. Resend's test sender cannot deliver to arbitrary new addresses, so name editing can be tested now, while a different-email end-to-end test may require a verified sender.
+
+Use a disposable account for deletion. Create a solo group and a shared group with another disposable member. Profile → Delete account lists the shared group's next owner and the solo group's permanent deletion. Enter the disposable account's password and DELETE. After confirmation, login with the deleted credentials must fail; the remaining member keeps the shared ledger with Deleted account names and unchanged balances. The solo group disappears immediately and its records purge after the 90-second grace period plus the worker's next minute tick. Keep the backend running for cleanup. Test only disposable accounts; deletion is irreversible.

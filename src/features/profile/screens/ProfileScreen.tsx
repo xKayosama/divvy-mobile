@@ -95,6 +95,10 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
             <Text className="text-lg font-semibold">
               Account details
             </Text>
+            <Button variant="outline" disabled={busy} onPress={() => router.push("/profile/edit")}>
+              <Ionicons name="create-outline" size={20} color={colors.primary} accessible={false} />
+              <Text>Edit profile</Text>
+            </Button>
 
             <View className="gap-1">
               <Text className="text-xs text-muted-foreground">
@@ -138,6 +142,14 @@ export default function ProfileScreen({ inTabs = false }: { inTabs?: boolean }) 
           </View>
 
           <BillNotificationSettings />
+
+          <View className="gap-3 rounded-[24px] border border-destructive/20 bg-card p-5">
+            <Text className="text-lg font-semibold">Account management</Text>
+            <Text className="text-sm leading-5 text-muted-foreground">Permanently delete your account and personal details. Review what happens to your groups before confirming.</Text>
+            <Button variant="outline" disabled={busy} onPress={() => router.push("/profile/delete")}>
+              <Text className="text-destructive">Delete account</Text>
+            </Button>
+          </View>
 
           <FormMessage message={message} />
 
